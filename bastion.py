@@ -38,7 +38,7 @@ def open_ssh_in_tmux_and_record(host):
     log_dst = "../asciinema_logs/%s-%s-%s-%s-%s-%s_%s_%s.log" % (
     host.user, host.domain, now.year, now.month, now.day, now.hour, now.minute, now.second)
 
-    ascii_cmd = "asciinema rec -c 'ssh %s@%s' %s" % (host.user, host.domain, log_dst)
+    ascii_cmd = "asciinema rec -c '%s' %s" % (host.connect_title(), log_dst)
 
     cmd = "tmux new-window -n %s \"%s ;read\"" % (host.connect_title(), ascii_cmd)
     execute_cmd(cmd)
@@ -108,7 +108,7 @@ class SSHConnectParam(object):
         return '%s@%s' % (self.user, self.domain)
 
     def ssh_command(self):
-        return 'ssh %@% -p %s' % (self.user, self.domain, self.port)
+        return 'ssh %s@%s -p %s' % (self.user, self.domain, self.port)
 
     def content(self):
         return '%s  |  %s | %s ' % (self.domain, self.category, self.desc)

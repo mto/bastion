@@ -1,22 +1,14 @@
 __author__ = 'hoang281283@gmail.com'
 
-username = 'mcloud'
+default_user = 'root'
+default_port = 22
 
 hosts = [
-    '123.30.146.208',
-    '123.30.146.209',
-    '192.168.10.1',
-    '192.168.10.2',
-    '192.168.10.3',
-    '192.168.10.4',
-    '192.168.10.5',
-    '192.168.10.6',
-    '192.168.10.7',
-    '192.168.10.8'
-
+    {'user': 'toto', 'domain': '192.168.10.1', 'category': 'API Servers', 'desc': 'Blah blah 1'},
+    {'user': 'tutu', 'domain': '192.168.10.2', 'category': 'API Servers', 'desc': 'Blah blah 2'},
+    {'user': 'toto', 'domain': '192.168.10.3', 'category': 'API Servers', 'desc': 'Blah blah 3'},
+    {'user': 'titi', 'domain': '192.168.10.4', 'category': 'Web Servers', 'desc': 'Blah blah 4'}
 ]
-
-port = 22
 
 tmux_session_name = "bastion"
 

@@ -20,27 +20,27 @@ def kill_tmux_session(name):
     execute_cmd("tmux kill-session -t %s" % name)
 
 
-def open_tmux_window(session, title):
+def open_tmux_window(title):
     execute_cmd("tmux new-window -n %s &" % title)
 
 
-def open_ssh_in_tmux(session, host):
-    ssh_cmd = "ssh %s@%s -p %s" % (config.username, host, config.port)
-    title = '%s@%s' % (config.username, host)
+def open_ssh_in_tmux(host):
+    assert isinstance(host, SSHConnectParam)
 
-    cmd = "tmux new-window -n %s '%s ;read'" % (title, ssh_cmd)
+    cmd = "tmux new-window -n %s '%s ;read'" % (host.connect_title(), host.ssh_command())
     execute_cmd(cmd)
 
 
 def open_ssh_in_tmux_and_record(host):
+    assert isinstance(host, SSHConnectParam)
+
     now = datetime.datetime.now()
-    log_dst = "../asciinema_logs/%s-%s_%s_%s_%s_%s_%s_%s.log" % (
-    config.username, host, now.year, now.month, now.day, now.hour, now.minute, now.second)
+    log_dst = "../asciinema_logs/%s-%s-%s-%s-%s-%s_%s_%s.log" % (
+    host.user, host.domain, now.year, now.month, now.day, now.hour, now.minute, now.second)
 
-    ascii_cmd = "asciinema rec -c 'ssh %s@%s -p %s' %s" % (config.username, host, config.port, log_dst)
-    title = '%s@%s' % (config.username, host)
+    ascii_cmd = "asciinema rec -c 'ssh %s@%s' %s" % (host.user, host.domain, log_dst)
 
-    cmd = "tmux new-window -n %s \"%s ;read\"" % (title, ascii_cmd)
+    cmd = "tmux new-window -n %s \"%s ;read\"" % (host.connect_title(), ascii_cmd)
     execute_cmd(cmd)
 
 
@@ -53,33 +53,42 @@ def start_command_executor(bastion):
 
 class Picker(object):
     def __init__(self):
-        self.total_lines = len(config.hosts)
-        self.selected_line = 0
+        self.total = 0
+        self.selected_index = 0
         self.change_viewport = False
+        self.hosts = []
 
-    def lines(self):
-        return config.hosts
+    def load_config(self):
+        for host in config.hosts:
+            user = host.get('user', config.default_user)
+            domain = host.get('domain')
+            port = host.get('port', config.default_port)
+            category = host.get('category', 'N/A')
+            desc = host.get('desc', 'N/A')
+
+            self.hosts.append(SSHConnectParam(user, domain, port, category, desc))
+            self.total += 1
+
+    def all_hosts(self):
+        return self.hosts
 
     def current(self):
-        return self.lines()[self.selected_line]
+        return self.hosts[self.selected_index]
 
     def move_down(self):
-        self.selected_line = (self.selected_line + 1) % self.total_lines
+        self.selected_index = (self.selected_index + 1) % self.total
 
     def move_up(self):
-        self.selected_line = (self.selected_line - 1) % self.total_lines
-
-    def select(self):
-        pass
+        self.selected_index = (self.selected_index - 1) % self.total
 
     def display_hosts(self, screen):
-        screen.addstr(2, 4, 'Hosts:')
-        hosts = self.lines()
-        for i in range(len(self.lines())):
-            if i == self.selected_line:
-                screen.addstr(i + 4, 4, hosts[i], curses.A_STANDOUT)
+        #screen.addstr(2, 4, 'Hosts:')
+        for i in range(len(self.hosts)):
+            host = self.hosts[i]
+            if i == self.selected_index:
+                screen.addstr(i + 4, 4, host.content() , curses.A_STANDOUT)
             else:
-                screen.addstr(i + 4, 4, hosts[i])
+                screen.addstr(i + 4, 4, host.content())
 
     def redraw(self, screen):
         screen.clear()
@@ -87,20 +96,32 @@ class Picker(object):
         screen.refresh()
 
 
+class SSHConnectParam(object):
+    def __init__(self, user, domain, port, category, desc):
+        self.user = user
+        self.domain = domain
+        self.port = port
+        self.category = category
+        self.desc = desc
+
+    def connect_title(self):
+        return '%s@%s' % (self.user, self.domain)
+
+    def ssh_command(self):
+        return 'ssh %@% -p %s' % (self.user, self.domain, self.port)
+
+    def content(self):
+        return '%s  |  %s | %s ' % (self.domain, self.category, self.desc)
+
+
 class Bastion(object):
     def __init__(self, picker, screen):
         self.picker = picker
         self.screen = screen
-        self.cmds = []
 
     def start(self):
         picker.display_hosts(screen)
-
-        # thread.start_new_thread(start_command_executor, (self,))
         self.start_event_loop()
-
-    def post_command(self, cmd):
-        self.cmds.append(cmd)
 
     def start_event_loop(self):
         while True:
@@ -129,6 +150,7 @@ if __name__ == '__main__':
     screen = curses.initscr()
     screen.border(0)
     picker = Picker()
+    picker.load_config()
 
     curses.noecho()
     curses.cbreak()

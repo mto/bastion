@@ -44,19 +44,21 @@ def open_ssh_in_tmux_and_record(host):
     execute_cmd(cmd)
 
 
-def start_command_executor(bastion):
-    while True:
-        if len(bastion.cmds) > 0:
-            cmd = bastion.cmds.pop(0)
-            os.system(cmd)
+def append_spaces(text, length):
+    size = len(text)
+    if size >= length:
+        return text
+    else:
+        return text + ' ' * (length - size)
 
 
 class Picker(object):
     def __init__(self):
         self.total = 0
         self.selected_index = 0
-        self.change_viewport = False
         self.hosts = []
+        self.loaded_hosts = []
+        self.total_loaded = 0
 
     def load_config(self):
         for host in config.hosts:
@@ -66,7 +68,10 @@ class Picker(object):
             category = host.get('category', 'N/A')
             desc = host.get('desc', 'N/A')
 
-            self.hosts.append(SSHConnectParam(user, domain, port, category, desc))
+            sshcp = SSHConnectParam(user, domain, port, category, desc)
+            self.loaded_hosts.append(sshcp)
+            self.total_loaded += 1
+            self.hosts.append(sshcp)
             self.total += 1
 
     def all_hosts(self):
@@ -80,6 +85,24 @@ class Picker(object):
 
     def move_up(self):
         self.selected_index = (self.selected_index - 1) % self.total
+
+    def update(self, hosts, selected_idx):
+        self.hosts = hosts
+        self.total = len(self.hosts)
+        self.selected_index = selected_idx
+
+    def reset(self):
+        self.hosts = self.loaded_hosts
+        self.total = self.total_loaded
+        self.selected_index = 0
+
+    def search(self, exp):
+        ret = list()
+        for host in self.loaded_hosts:
+            if host.contain(exp):
+                ret.append(host)
+
+        return ret
 
 
 class SSHConnectParam(object):
@@ -97,13 +120,24 @@ class SSHConnectParam(object):
         return 'ssh %s@%s -p %s' % (self.user, self.domain, self.port)
 
     def content(self):
-        return '%s  |  %s | %s ' % (self.domain, self.category, self.desc)
+        u = append_spaces(self.user, 20)
+        d = append_spaces(self.domain, 50)
+        p = append_spaces(str(self.port), 10)
+
+        return ' %s  %s  %s  %s' % (u, d, p, self.category)
+
+    def match(self, regex):
+        pass
+
+    def contain(self, exp):
+        return str.find(self.content(), exp) >= 0
 
 
 class Screen(object):
     def __init__(self, window):
         self.window = window
         self.search_mode = False
+        self.search_txt = ''
 
     def refresh(self):
         self.window.refresh()
@@ -119,9 +153,16 @@ class Screen(object):
 
     def exit_search_mode(self):
         self.search_mode = False
+        self.search_txt = ''
 
     def search_mode(self):
         return self.search_mode
+
+    def type_search_char(self, ch):
+        self.search_txt += ch
+
+    def delete_search_char(self):
+        self.search_txt = self.search_txt[:-1]
 
     def get_width(self):
         return self.window.getmaxyx()[1]
@@ -130,29 +171,30 @@ class Screen(object):
         return self.window.getmaxyx()[0]
 
     def display_header(self):
-        txt = 'Hosts'
-        if self.search_mode:
-            txt = 'Matched Hosts'
-
-        self.window.addstr(1, 4, txt)
-        self.window.hline(2, 1, '#', self.get_width() - 2)
+        txt = append_spaces('Username', 22) + append_spaces('Domain', 52) + append_spaces('Port', 12) + append_spaces(
+            'Category', 30)
+        self.window.addstr(1, 1, txt)
+        self.window.hline(2, 1, '-', len(txt))
 
     def display_hosts(self, hosts, sidx):
         for i in range(len(hosts)):
             host = hosts[i]
             if i == sidx:
-                self.window.addstr(i + 4, 4, host.content(), curses.A_STANDOUT)
+                self.window.addstr(i + 4, 1, host.content(), curses.A_STANDOUT)
             else:
-                self.window.addstr(i + 4, 4, host.content())
+                self.window.addstr(i + 4, 1, host.content())
 
     def display_search_box(self):
         if not self.search_mode:
             return
-        txt = '[SEARCH] type something to search | [ENTER] run | [ESC] quit'
-        self.window.addstr(self.get_height() - 2, 0, txt)
+        txt = '[SEARCH MODE] type something to search | [DEL] Remove last typed character | [ESC] Exit Search Mode'
+        h = self.get_height()
+        self.window.addstr(h - 2, 1, txt)
+        self.window.addstr(h - 4, 1, self.search_txt)
 
     def redraw(self, hosts, sidx):
         self.clear()
+        self.window.border(0)
         self.display_header()
         self.display_hosts(hosts, sidx)
         self.display_search_box()
@@ -205,8 +247,30 @@ class Bastion(object):
     def handle_event_in_search_mode(self, key):
         if key == 27:  # Press 'ESC'
             self.screen.exit_search_mode()
+            self.picker.reset()
             self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
+        elif key == curses.KEY_UP:
+            self.picker.move_up()
+            self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+
+        elif key == curses.KEY_DOWN:
+            self.picker.move_down()
+            self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+
+        elif key == 127: #The DEL key
+            self.screen.delete_search_char()
+            hosts = self.picker.search(self.screen.search_txt)
+            self.picker.update(hosts, 0)
+
+            self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+
+        else:
+            self.screen.type_search_char(chr(key))
+            hosts = self.picker.search(self.screen.search_txt)
+            self.picker.update(hosts, 0)
+
+            self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
 if __name__ == '__main__':
     window = curses.initscr()

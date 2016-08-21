@@ -226,7 +226,7 @@ class Screen(object):
         self.display_panel.show()
 
         key = dpw.getch()
-        if key == 127:  # Press ESC
+        if key == 27:  # Press ESC
             self.display_panel.hide()
 
 
@@ -282,9 +282,6 @@ class Bastion(object):
                     self.screen.enter_search_mode()
                     self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
-                else:
-                    self.screen.window.addstr(1, 1, curses.keyname(key))
-
         curses.endwin()
         kill_tmux_session(self.tmux_name)
 
@@ -323,9 +320,9 @@ class Bastion(object):
 
             self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
-        else:
+        elif key < 256:
             c = chr(key)
-            if str.isalnum(c) or c == ' ' or c == ',' or c == '.':
+            if str.isalnum(c) or c == ' ' or c == ',' or c == '.' or c == '&':
                 self.screen.type_search_char(chr(key))
                 hosts = self.picker.search(self.screen.search_txt)
                 self.picker.update(hosts, 0)

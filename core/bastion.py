@@ -2,10 +2,12 @@
 
 __author__ = 'hoang281283@gmail.com'
 
-import config
 import curses
+import curses.panel
 import os
 import datetime
+
+import config
 
 
 def execute_cmd(cmd):
@@ -138,6 +140,7 @@ class Screen(object):
         self.window = window
         self.search_mode = False
         self.search_txt = ''
+        self.display_panel = curses.panel.new_panel(curses.newwin(30, 100, 5, 10))
 
     def refresh(self):
         self.window.refresh()
@@ -185,12 +188,14 @@ class Screen(object):
                 self.window.addstr(i + 4, 1, host.content())
 
     def display_search_box(self):
-        if not self.search_mode:
-            return
-        txt = '[SEARCH MODE] type something to search | [DEL] Remove last typed character | [ESC] Exit Search Mode'
         h = self.get_height()
-        self.window.addstr(h - 2, 1, txt)
-        self.window.addstr(h - 4, 1, self.search_txt)
+        if not self.search_mode:
+            self.window.addstr(h - 2, 1, '[/] Enter SEARCH mode| [ENTER] View host| [q] Quit')
+        else:
+            txt = '[SEARCH MODE]: Type something to search | [DEL]: Remove last typed character ' \
+                  '| [ESC]: Exit Search Mode'
+            self.window.addstr(h - 2, 1, txt)
+            self.window.addstr(h - 4, 1, self.search_txt)
 
     def redraw(self, hosts, sidx):
         self.clear()
@@ -200,18 +205,41 @@ class Screen(object):
         self.display_search_box()
         self.refresh()
 
+    def show_host_detail(self, host):
+        assert isinstance(host, SSHConnectParam)
+        dpw = self.display_panel.window()
+        dpw.clear()
+        dpw.border(0)
+        dpw.addstr(2, 1, 'USERNAME: %s' % host.user)
+        dpw.addstr(4, 1, 'DOMAIN: %s' % host.domain)
+        dpw.addstr(6, 1, 'PORT: %s' % host.port)
+        dpw.addstr(8, 1, 'CATEGORY: %s' % host.category)
+        dpw.addstr(10, 1, 'DESCRIPTION: %s' % host.desc)
+        dpw.addstr(28, 1, '[ENTER]: Open SSH connection | [ESC]: Close dialog')
+
+        self.display_panel.show()
+
+        key = dpw.getch()
+        if key == 27:  # Press ESC
+            self.display_panel.hide()
+        elif key == 10:  # Press ENTER
+            self.display_panel.hide()
+            open_ssh_in_tmux_and_record(host)
+
 
 class Bastion(object):
-    def __init__(self, picker, screen):
+    def __init__(self, picker, screen, sid):
         assert isinstance(picker, Picker)
         assert isinstance(screen, Screen)
 
         self.picker = picker
         self.screen = screen
+        self.tmux_name = 'bastion-' + sid
 
     def start(self):
         self.screen.display_header()
         self.screen.display_hosts(self.picker.all_hosts(), self.picker.selected_index)
+        self.screen.display_search_box()
 
         self.start_event_loop()
 
@@ -234,15 +262,17 @@ class Bastion(object):
                     self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
                 elif key == 10:  # Press ENTER
-                    host = picker.current()
-                    open_ssh_in_tmux_and_record(host)
+                    curses.beep()
+                    host = self.picker.current()
+                    # open_ssh_in_tmux_and_record(host)
+                    self.screen.show_host_detail(host)
 
                 elif key == 47:  # Press '/'
                     self.screen.enter_search_mode()
                     self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
         curses.endwin()
-        kill_tmux_session('bastion')
+        kill_tmux_session(self.tmux_name)
 
     def handle_event_in_search_mode(self, key):
         if key == 27:  # Press 'ESC'
@@ -258,7 +288,11 @@ class Bastion(object):
             self.picker.move_down()
             self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
-        elif key == 127: #The DEL key
+        elif key == 10:  # Press Enter
+            curses.beep()
+            self.screen.show_host_detail(self.picker.current())
+
+        elif key == 127:  # The DEL key
             self.screen.delete_search_char()
             hosts = self.picker.search(self.screen.search_txt)
             self.picker.update(hosts, 0)
@@ -266,13 +300,16 @@ class Bastion(object):
             self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
         else:
-            self.screen.type_search_char(chr(key))
-            hosts = self.picker.search(self.screen.search_txt)
-            self.picker.update(hosts, 0)
+            c = chr(key)
+            if str.isalnum(c) or c == ' ' or c == ',' or c == '.':
+                self.screen.type_search_char(chr(key))
+                hosts = self.picker.search(self.screen.search_txt)
+                self.picker.update(hosts, 0)
 
-            self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+                self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
-if __name__ == '__main__':
+
+def bootstrap(sid):
     window = curses.initscr()
     window.border(0)
     curses.noecho()
@@ -284,4 +321,5 @@ if __name__ == '__main__':
     picker = Picker()
     picker.load_config()
 
-    Bastion(picker, screen).start()
+    Bastion(picker, screen, sid).start()
+

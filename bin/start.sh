@@ -2,7 +2,9 @@
 
 echo "Starting Bastion ..."
 
-tmux new-session -d -s bastion
-tmux send-keys -t bastion 'python ../bastion.py' C-m
-tmux attach -t bastion
+SID=$RANDOM
+
+tmux new-session -d -s bastion-$SID
+tmux send-keys -t bastion-$SID "python ../run.py $SID" C-m
+tmux attach -t bastion-$SID
 

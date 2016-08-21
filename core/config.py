@@ -2,10 +2,11 @@ __author__ = 'hoang281283@gmail.com'
 
 default_user = 'root'
 default_port = 22
+default_record = True
 
 hosts = [
     {'user': 'toto', 'domain': '192.168.10.1', 'port': 2222, 'category': 'API, Cache', 'desc': 'Blah blah 1'},
-    {'user': 'tutu', 'domain': '192.168.10.2', 'category': 'API, DB, RabbitMQ', 'desc': 'Blah blah 2'},
+    {'user': 'tutu', 'domain': '192.168.10.2', 'category': 'API, DB, RabbitMQ', 'record': False, 'desc': 'Blah blah 2'},
     {'user': 'toto', 'domain': '192.168.10.3', 'category': 'API, RabbitMQ', 'desc': 'Blah blah 3'},
     {'user': 'toto2', 'domain': '192.168.10.3', 'category': 'Elastic Search', 'desc': 'Blah blah 3'},
     {'user': 'toto2', 'domain': '192.168.10.3', 'category': 'API, Nginx', 'desc': 'Blah blah 3'},

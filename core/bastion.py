@@ -69,8 +69,9 @@ class Picker(object):
             port = host.get('port', config.default_port)
             category = host.get('category', 'N/A')
             desc = host.get('desc', 'N/A')
+            record = host.get('record', config.default_record)
 
-            sshcp = SSHConnectParam(user, domain, port, category, desc)
+            sshcp = SSHConnectParam(user, domain, port, category, desc, record)
             self.loaded_hosts.append(sshcp)
             self.total_loaded += 1
             self.hosts.append(sshcp)
@@ -111,12 +112,13 @@ class Picker(object):
 
 
 class SSHConnectParam(object):
-    def __init__(self, user, domain, port, category, desc):
+    def __init__(self, user, domain, port, category, desc, record=False):
         self.user = user
         self.domain = domain
         self.port = port
         self.category = category
         self.desc = desc
+        self.record = record
 
     def connect_title(self):
         return '%s@%s' % (self.user, self.domain)
@@ -193,10 +195,10 @@ class Screen(object):
     def display_search_box(self):
         h = self.get_height()
         if not self.search_mode:
-            self.window.addstr(h - 2, 1, '[/] Enter SEARCH mode| [ENTER] View host| [q] Quit')
+            self.window.addstr(h - 2, 1, '[/] Enter SEARCH mode| [ENTER] SSH Connect| [Ctrl+I] View host| [q] Quit')
         else:
             txt = '[SEARCH MODE]: Type something to search | [DEL]: Remove last typed character ' \
-                  '| [ESC]: Exit Search Mode'
+                  '| [ENTER] SSH Connect| [Ctrl+I] View host |[ESC]: Exit Search Mode'
             self.window.addstr(h - 2, 1, txt)
             self.window.addstr(h - 4, 1, self.search_txt)
 
@@ -217,17 +219,15 @@ class Screen(object):
         dpw.addstr(4, 1, 'DOMAIN: %s' % host.domain)
         dpw.addstr(6, 1, 'PORT: %s' % host.port)
         dpw.addstr(8, 1, 'CATEGORY: %s' % host.category)
-        dpw.addstr(10, 1, 'DESCRIPTION: %s' % host.desc)
-        dpw.addstr(28, 1, '[ENTER]: Open SSH connection | [ESC]: Close dialog')
+        dpw.addstr(10, 1, 'RECORD: %s' % str(host.record))
+        dpw.addstr(12, 1, 'DESCRIPTION: %s' % host.desc)
+        dpw.addstr(28, 1, '[ESC]: Close dialog')
 
         self.display_panel.show()
 
         key = dpw.getch()
-        if key == 27:  # Press ESC
+        if key == 127:  # Press ESC
             self.display_panel.hide()
-        elif key == 10:  # Press ENTER
-            self.display_panel.hide()
-            open_ssh_in_tmux_and_record(host)
 
 
 class Bastion(object):
@@ -264,7 +264,15 @@ class Bastion(object):
                     self.picker.move_down()
                     self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
-                elif key == 10:  # Press ENTER
+                elif key == 10: # Press Enter
+                    host = self.picker.current()
+                    if host is not None:
+                        if host.record:
+                            open_ssh_in_tmux_and_record(host)
+                        else:
+                            open_ssh_in_tmux(host)
+
+                elif curses.keyname(key) == '^I':  # Press Ctrl+i
                     curses.beep()
                     host = self.picker.current()
                     if host is not None:
@@ -273,6 +281,9 @@ class Bastion(object):
                 elif key == 47:  # Press '/'
                     self.screen.enter_search_mode()
                     self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+
+                else:
+                    self.screen.window.addstr(1, 1, curses.keyname(key))
 
         curses.endwin()
         kill_tmux_session(self.tmux_name)
@@ -291,7 +302,15 @@ class Bastion(object):
             self.picker.move_down()
             self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
-        elif key == 10:  # Press Enter
+        elif key == 10: # Press Enter
+            host = self.picker.current()
+            if host is not None:
+                if host.record:
+                    open_ssh_in_tmux_and_record(host)
+                else:
+                    open_ssh_in_tmux(host)
+
+        elif curses.keyname(key) == '^I':  # Press Ctrl+i
             curses.beep()
             host = self.picker.current()
             if host is not None:

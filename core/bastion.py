@@ -80,7 +80,10 @@ class Picker(object):
         return self.hosts
 
     def current(self):
-        return self.hosts[self.selected_index]
+        if len(self.hosts) > self.selected_index:
+            return self.hosts[self.selected_index]
+        else:
+            return None
 
     def move_down(self):
         self.selected_index = (self.selected_index + 1) % self.total
@@ -264,8 +267,8 @@ class Bastion(object):
                 elif key == 10:  # Press ENTER
                     curses.beep()
                     host = self.picker.current()
-                    # open_ssh_in_tmux_and_record(host)
-                    self.screen.show_host_detail(host)
+                    if host is not None:
+                        self.screen.show_host_detail(host)
 
                 elif key == 47:  # Press '/'
                     self.screen.enter_search_mode()
@@ -290,7 +293,9 @@ class Bastion(object):
 
         elif key == 10:  # Press Enter
             curses.beep()
-            self.screen.show_host_detail(self.picker.current())
+            host = self.picker.current()
+            if host is not None:
+                self.screen.show_host_detail(self.picker.current())
 
         elif key == 127:  # The DEL key
             self.screen.delete_search_char()

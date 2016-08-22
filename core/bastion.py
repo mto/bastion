@@ -227,13 +227,18 @@ class Screen(object):
         dpw.addstr(8, 1, 'CATEGORY: %s' % host.category)
         dpw.addstr(10, 1, 'RECORD: %s' % str(host.record))
         dpw.addstr(12, 1, 'DESCRIPTION: %s' % host.desc)
-        dpw.addstr(28, 1, '[ESC]: Close dialog')
+        dpw.addstr(28, 1, '[ENTER]: SSH Connect | [ESC]: Close dialog')
 
         self.display_panel.show()
 
         key = dpw.getch()
         if key == 27:  # Press ESC
             self.display_panel.hide()
+        elif key == 10:
+            if host.record:
+                open_ssh_in_tmux_and_record(host)
+            else:
+                open_ssh_in_tmux(host)
 
 
 class Bastion(object):
@@ -277,6 +282,9 @@ class Bastion(object):
                             open_ssh_in_tmux_and_record(host)
                         else:
                             open_ssh_in_tmux(host)
+
+                elif key == curses.KEY_RESIZE:
+                    pass
 
                 elif curses.keyname(key) == '^I':  # Press Ctrl+i
                     curses.beep()

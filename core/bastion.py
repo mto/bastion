@@ -137,7 +137,13 @@ class SSHConnectParam(object):
         pass
 
     def contain(self, exp):
-        return str.find(self.content(), exp) >= 0
+        p = exp.lower()
+
+        return str.find(self.user.lower(), p) >= 0 or \
+               str.find(self.domain.lower(), p) >= 0 or \
+               str.find(self.port.lower(), p) >= 0 or \
+               str.find(self.category.lower(), p) >= 0 or \
+               str.find(self.desc.lower(), p) >= 0
 
 
 class Screen(object):

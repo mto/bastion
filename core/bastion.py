@@ -282,7 +282,7 @@ class Screen(object):
 
 
 class Bastion(object):
-    def __init__(self, picker, screen, sid):
+    def __init__(self, picker, screen, sid, admin_mode=False):
         assert isinstance(picker, Picker)
         assert isinstance(screen, Screen)
 
@@ -290,6 +290,7 @@ class Bastion(object):
         self.screen = screen
         self.tmux_name = 'bastion-' + sid
         self.multi_select = False
+        self.admin_mode = admin_mode
 
     def start(self):
         self.screen.display_header()
@@ -312,7 +313,7 @@ class Bastion(object):
             if self.screen.search_mode:
                 self.handle_event_in_search_mode(key)
             else:
-                if key == 113:  # Quit q
+                if self.admin_mode and key == 113:  # Quit q
                     break
 
                 elif key == curses.KEY_UP:
@@ -429,7 +430,7 @@ class Bastion(object):
                 self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
 
-def bootstrap(sid):
+def bootstrap(sid, admin_mode=False):
     window = curses.initscr()
     window.border(0)
     curses.noecho()
@@ -441,5 +442,5 @@ def bootstrap(sid):
     picker = Picker()
     picker.load_config()
 
-    Bastion(picker, screen, sid).start()
+    Bastion(picker, screen, sid, admin_mode).start()
 

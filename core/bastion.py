@@ -142,7 +142,7 @@ class SSHConnectParam(object):
 
         return str.find(self.user.lower(), p) >= 0 or \
                str.find(self.domain.lower(), p) >= 0 or \
-               str.find(self.port.lower(), p) >= 0 or \
+               str.find(str(self.port), p) >= 0 or \
                str.find(self.category.lower(), p) >= 0 or \
                str.find(self.desc.lower(), p) >= 0
 

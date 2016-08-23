@@ -4,6 +4,8 @@ default_user = 'root'
 default_port = 22
 default_record = True
 
+idle_period = 86400000
+
 hosts = [
     {'user': 'toto', 'domain': '192.168.10.1', 'port': 2222, 'category': 'API, Cache', 'desc': 'Blah blah 1'},
     {'user': 'tutu', 'domain': '192.168.10.2', 'category': 'API, DB, RabbitMQ', 'record': False, 'desc': 'Blah blah 2'},

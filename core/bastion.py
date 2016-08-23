@@ -185,11 +185,12 @@ class SSHConnectParam(object):
 
 
 class Screen(object):
-    def __init__(self, window):
+    def __init__(self, window, admin_mode=False):
         self.window = window
         self.search_mode = False
         self.search_txt = ''
         self.display_panel = curses.panel.new_panel(curses.newwin(30, 100, 5, 10))
+        self.admin_mode = admin_mode
 
     def refresh(self):
         self.window.refresh()
@@ -241,10 +242,14 @@ class Screen(object):
     def display_search_box(self):
         h = self.get_height()
         if not self.search_mode:
-            self.window.addstr(h - 2, 1, '[/] Enter SEARCH mode| [ENTER] SSH Connect| [Ctrl+I] View host| [q] Quit')
+            if self.admin_mode:
+                self.window.addstr(h - 2, 1, '[/] Enter SEARCH mode| [ENTER] Connect| [Shift+i] View Host| [q] Quit')
+            else:
+                self.window.addstr(h - 2, 1, '[/] Enter SEARCH mode| [ENTER] Connect| [Shift+i] View Host')
+
         else:
             txt = '[SEARCH MODE]: Type something to search | [DEL]: Remove last typed character ' \
-                  '| [ENTER] SSH Connect| [Ctrl+I] View host |[ESC]: Exit Search Mode'
+                  '| [ENTER] Connect| [Shift+I] View Host |[ESC]: Exit Search Mode'
             self.window.addstr(h - 2, 1, txt)
             self.window.addstr(h - 4, 1, self.search_txt)
 
@@ -306,7 +311,7 @@ class Bastion(object):
             if self.multi_select and key != curses.KEY_DOWN and key != 10:
                 self.multi_select = False
 
-            if not self.multi_select and key == 32:# Press on SPACE to enter multi-selection mode
+            if not self.multi_select and key == 32:  # Press on SPACE to enter multi-selection mode
                 self.multi_select = True
                 self.picker.enter_multi_select()
 
@@ -349,7 +354,7 @@ class Bastion(object):
                 elif key == curses.KEY_RESIZE:
                     pass
 
-                elif curses.keyname(key) == '^I':  # Press Ctrl+i
+                elif key == ord('I'):  # Press Shift+i
                     curses.beep()
                     host = self.picker.current()
                     if host is not None:
@@ -407,7 +412,7 @@ class Bastion(object):
                     else:
                         open_ssh_in_tmux(host)
 
-        elif curses.keyname(key) == '^I':  # Press Ctrl+i
+        elif key == ord('I'):  # Press Shift+i
             curses.beep()
             host = self.picker.current()
             if host is not None:
@@ -437,7 +442,7 @@ def bootstrap(sid, admin_mode=False):
     curses.cbreak()
     window.keypad(1)
 
-    screen = Screen(window)
+    screen = Screen(window, admin_mode)
 
     picker = Picker()
     picker.load_config()

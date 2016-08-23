@@ -61,6 +61,7 @@ class Picker(object):
         self.hosts = []
         self.loaded_hosts = []
         self.total_loaded = 0
+        self.multi_selected_hosts = []
 
     def load_config(self):
         for host in config.hosts:
@@ -249,6 +250,7 @@ class Bastion(object):
         self.picker = picker
         self.screen = screen
         self.tmux_name = 'bastion-' + sid
+        self.multi_select = False
 
     def start(self):
         self.screen.display_header()
@@ -257,7 +259,7 @@ class Bastion(object):
 
         self.start_event_loop()
 
-    def start_event_loop(self):
+    def event_loop(self):
         while True:
             key = self.screen.getch()
 
@@ -296,8 +298,17 @@ class Bastion(object):
                     self.screen.enter_search_mode()
                     self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
-        curses.endwin()
-        kill_tmux_session(self.tmux_name)
+    def start_event_loop(self):
+        try:
+            self.event_loop()
+        except Exception as e:
+            print e
+        finally:
+            curses.nocbreak()
+            self.screen.window.keypad(0)
+            curses.echo()
+            curses.endwin()
+            kill_tmux_session(self.tmux_name)
 
     def handle_event_in_search_mode(self, key):
         if key == 27:  # Press 'ESC'

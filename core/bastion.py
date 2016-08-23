@@ -33,6 +33,11 @@ def open_ssh_in_tmux(host):
     execute_cmd(cmd)
 
 
+def open_multi_ssh_in_tmux(hosts):
+    for host in hosts:
+        open_ssh_in_tmux(host)
+
+
 def open_ssh_in_tmux_and_record(host):
     assert isinstance(host, SSHConnectParam)
 
@@ -44,6 +49,11 @@ def open_ssh_in_tmux_and_record(host):
 
     cmd = "tmux new-window -n %s \"%s ;read\"" % (host.connect_title(), ascii_cmd)
     execute_cmd(cmd)
+
+
+def open_multi_ssh_in_tmux_and_record(hosts):
+    for host in hosts:
+        open_ssh_in_tmux_and_record(host)
 
 
 def append_spaces(text, length):
@@ -64,7 +74,8 @@ class Picker(object):
         self.multi_selected_hosts = []
 
     def load_config(self):
-        for host in config.hosts:
+        for i in range(len(config.hosts)):
+            host = config.hosts[i]
             user = host.get('user', config.default_user)
             domain = host.get('domain')
             port = host.get('port', config.default_port)
@@ -72,7 +83,7 @@ class Picker(object):
             desc = host.get('desc', 'N/A')
             record = host.get('record', config.default_record)
 
-            sshcp = SSHConnectParam(user, domain, port, category, desc, record)
+            sshcp = SSHConnectParam(str(i), user, domain, port, category, desc, record)
             self.loaded_hosts.append(sshcp)
             self.total_loaded += 1
             self.hosts.append(sshcp)
@@ -111,9 +122,26 @@ class Picker(object):
 
         return ret
 
+    def multi_select_add(self, host):
+        self.multi_selected_hosts.append(host)
+
+    def enter_multi_select(self):
+        self.multi_selected_hosts = []
+        host = self.current()
+        if host is not None:
+            self.multi_selected_hosts.append(host)
+
+    def exit_multi_select(self):
+        self.multi_selected_hosts = []
+
+    def ms_hosts(self):
+        ret = list() + self.multi_selected_hosts
+        return ret
+
 
 class SSHConnectParam(object):
-    def __init__(self, user, domain, port, category, desc, record=False):
+    def __init__(self, number, user, domain, port, category, desc, record=False):
+        self.number = number
         self.user = user
         self.domain = domain
         self.port = port
@@ -145,6 +173,15 @@ class SSHConnectParam(object):
                str.find(str(self.port), p) >= 0 or \
                str.find(self.category.lower(), p) >= 0 or \
                str.find(self.desc.lower(), p) >= 0
+
+    def equals(self, host):
+        return isinstance(host, SSHConnectParam) and self.number == host.number
+
+    def belongs_to(self, hosts):
+        for host in hosts:
+            if self.equals(host):
+                return True
+        return False
 
 
 class Screen(object):
@@ -191,10 +228,12 @@ class Screen(object):
         self.window.addstr(1, 1, txt)
         self.window.hline(2, 1, '-', len(txt))
 
-    def display_hosts(self, hosts, sidx):
+    def display_hosts(self, hosts, sidx, multi_selected_hosts=None):
         for i in range(len(hosts)):
             host = hosts[i]
             if i == sidx:
+                self.window.addstr(i + 4, 1, host.content(), curses.A_STANDOUT)
+            elif multi_selected_hosts is not None and host.belongs_to(multi_selected_hosts):
                 self.window.addstr(i + 4, 1, host.content(), curses.A_STANDOUT)
             else:
                 self.window.addstr(i + 4, 1, host.content())
@@ -209,11 +248,11 @@ class Screen(object):
             self.window.addstr(h - 2, 1, txt)
             self.window.addstr(h - 4, 1, self.search_txt)
 
-    def redraw(self, hosts, sidx):
+    def redraw(self, hosts, sidx, multi_selected_hosts=None):
         self.clear()
         self.window.border(0)
         self.display_header()
-        self.display_hosts(hosts, sidx)
+        self.display_hosts(hosts, sidx, multi_selected_hosts)
         self.display_search_box()
         self.refresh()
 
@@ -263,6 +302,13 @@ class Bastion(object):
         while True:
             key = self.screen.getch()
 
+            if self.multi_select and key != curses.KEY_DOWN and key != 10:
+                self.multi_select = False
+
+            if not self.multi_select and key == 32:# Press on SPACE to enter multi-selection mode
+                self.multi_select = True
+                self.picker.enter_multi_select()
+
             if self.screen.search_mode:
                 self.handle_event_in_search_mode(key)
             else:
@@ -275,15 +321,29 @@ class Bastion(object):
 
                 elif key == curses.KEY_DOWN:
                     self.picker.move_down()
-                    self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+
+                    if self.multi_select:
+                        host = self.picker.current()
+                        if host is not None:
+                            self.picker.multi_selected_hosts.append(host)
+                        self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index, self.picker.ms_hosts())
+                    else:
+                        self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
                 elif key == 10: # Press Enter
-                    host = self.picker.current()
-                    if host is not None:
-                        if host.record:
-                            open_ssh_in_tmux_and_record(host)
-                        else:
-                            open_ssh_in_tmux(host)
+                    if self.multi_select:
+                        self.multi_select = False
+                        ms_hosts = self.picker.ms_hosts()
+                        self.picker.exit_multi_select()
+                        if len(ms_hosts) > 0:
+                            open_multi_ssh_in_tmux(ms_hosts)
+                    else:
+                        host = self.picker.current()
+                        if host is not None:
+                            if host.record:
+                                open_ssh_in_tmux_and_record(host)
+                            else:
+                                open_ssh_in_tmux(host)
 
                 elif key == curses.KEY_RESIZE:
                     pass
@@ -322,15 +382,29 @@ class Bastion(object):
 
         elif key == curses.KEY_DOWN:
             self.picker.move_down()
-            self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+
+            if self.multi_select:
+                host = self.picker.current()
+                if host is not None:
+                    self.picker.multi_selected_hosts.append(host)
+                self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index, self.picker.ms_hosts())
+            else:
+                self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
         elif key == 10: # Press Enter
-            host = self.picker.current()
-            if host is not None:
-                if host.record:
-                    open_ssh_in_tmux_and_record(host)
-                else:
-                    open_ssh_in_tmux(host)
+            if self.multi_select:
+                self.multi_select = False
+                ms_hosts = self.picker.ms_hosts()
+                self.picker.exit_multi_select()
+                if len(ms_hosts) > 0:
+                    open_multi_ssh_in_tmux(ms_hosts)
+            else:
+                host = self.picker.current()
+                if host is not None:
+                    if host.record:
+                        open_ssh_in_tmux_and_record(host)
+                    else:
+                        open_ssh_in_tmux(host)
 
         elif curses.keyname(key) == '^I':  # Press Ctrl+i
             curses.beep()

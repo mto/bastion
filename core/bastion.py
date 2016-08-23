@@ -248,8 +248,8 @@ class Screen(object):
                 self.window.addstr(h - 2, 1, '[/] Enter SEARCH mode| [ENTER] Connect| [Shift+i] View Host')
 
         else:
-            txt = '[SEARCH MODE]: Type something to search | [DEL]: Remove last typed character ' \
-                  '| [ENTER] Connect| [Shift+I] View Host |[ESC]: Exit Search Mode'
+            txt = '[SEARCH MODE]: Type something to search' \
+                  '| [ENTER] Connect| [Shift+i] View Host |[ESC]: Exit Search Mode'
             self.window.addstr(h - 2, 1, txt)
             self.window.addstr(h - 4, 1, self.search_txt)
 
@@ -272,7 +272,7 @@ class Screen(object):
         dpw.addstr(8, 1, 'CATEGORY: %s' % host.category)
         dpw.addstr(10, 1, 'RECORD: %s' % str(host.record))
         dpw.addstr(12, 1, 'DESCRIPTION: %s' % host.desc)
-        dpw.addstr(28, 1, '[ENTER]: SSH Connect | [ESC]: Close dialog')
+        dpw.addstr(28, 1, '[ENTER]: Connect | [ESC]: Close dialog')
 
         self.display_panel.show()
 
@@ -412,6 +412,9 @@ class Bastion(object):
                     else:
                         open_ssh_in_tmux(host)
 
+        elif key == curses.KEY_RESIZE:
+            pass
+        
         elif key == ord('I'):  # Press Shift+i
             curses.beep()
             host = self.picker.current()

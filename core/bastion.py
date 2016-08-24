@@ -7,6 +7,7 @@ import curses.panel
 import os
 import datetime
 import config
+import time
 
 
 def execute_cmd(cmd):
@@ -82,21 +83,11 @@ class Picker(object):
         self.total_loaded = 0
         self.multi_selected_hosts = []
 
-    def load_config(self):
-        for i in range(len(config.hosts)):
-            host = config.hosts[i]
-            user = host.get('user', config.default_user)
-            domain = host.get('domain')
-            port = host.get('port', config.default_port)
-            category = host.get('category', 'N/A')
-            desc = host.get('desc', 'N/A')
-            record = host.get('record', config.default_record)
-
-            sshcp = SSHConnectParam(str(i), user, domain, port, category, desc, record)
-            self.loaded_hosts.append(sshcp)
-            self.total_loaded += 1
-            self.hosts.append(sshcp)
-            self.total += 1
+    def initialize(self, items):
+        self.loaded_hosts = list() + items
+        self.total_loaded = len(items)
+        self.hosts = list() + items
+        self.total = len(items)
 
     def all_hosts(self):
         return self.hosts
@@ -393,6 +384,7 @@ class Bastion(object):
         self.multi_select = False
         self.admin_mode = admin_mode
         self.log_man = log_man
+        self.start_time = int(time.time()*1000)
 
     def start(self):
         self.screen.display_logo()
@@ -406,7 +398,7 @@ class Bastion(object):
         while True:
             key = self.screen.getch()
 
-            if key == -1:  # Timeout
+            if key == -1 and (self.start_time + config.idle_period) <= int(time.time()*1000):  # Timeout
                 break
 
             if self.multi_select and key != curses.KEY_DOWN and key != 10:
@@ -554,7 +546,20 @@ def bootstrap(sid, admin_mode=False, logo_content=[]):
     screen = Screen(window, admin_mode, logo_content)
 
     picker = Picker()
-    picker.load_config()
+    hosts = list()
+    for i in range(len(config.hosts)):
+        host = config.hosts[i]
+        user = host.get('user', config.default_user)
+        domain = host.get('domain')
+        port = host.get('port', config.default_port)
+        category = host.get('category', 'N/A')
+        desc = host.get('desc', 'N/A')
+        record = host.get('record', config.default_record)
+
+        sshcp = SSHConnectParam(str(i), user, domain, port, category, desc, record)
+        hosts.append(sshcp)
+
+    picker.initialize(hosts)
 
     #log_man = LogManager('../asciinema_logs')
     #Bastion(picker, screen, sid, admin_mode, log_man).start()

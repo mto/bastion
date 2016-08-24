@@ -6,7 +6,6 @@ import curses
 import curses.panel
 import os
 import datetime
-
 import config
 
 
@@ -35,7 +34,10 @@ def open_ssh_in_tmux(host):
 
 def open_multi_ssh_in_tmux(hosts):
     for host in hosts:
-        open_ssh_in_tmux(host)
+        if host.record:
+            open_ssh_in_tmux_and_record(host)
+        else:
+            open_ssh_in_tmux(host)
 
 
 def open_ssh_in_tmux_and_record(host):
@@ -54,6 +56,13 @@ def open_ssh_in_tmux_and_record(host):
 def open_multi_ssh_in_tmux_and_record(hosts):
     for host in hosts:
         open_ssh_in_tmux_and_record(host)
+
+
+def playback_asciinema_log_in_tmux(logfile):
+    ascii_cmd = "asciinema play '%s'" % logfile
+
+    cmd = "tmux new-window -n ShowLog \"%s ;read\"" % (ascii_cmd)
+    execute_cmd(cmd)
 
 
 def append_spaces(text, length):
@@ -185,12 +194,19 @@ class SSHConnectParam(object):
 
 
 class Screen(object):
-    def __init__(self, window, admin_mode=False):
+    def __init__(self, window, admin_mode=False, logo_content=[]):
         self.window = window
         self.search_mode = False
         self.search_txt = ''
         self.display_panel = curses.panel.new_panel(curses.newwin(30, 100, 5, 10))
+        self.display_log_panel = curses.panel.new_panel(curses.newwin(30, 100, 5, 10))
         self.admin_mode = admin_mode
+        self.logo_content = logo_content
+        self.logo_height = len(self.logo_content) + 2
+        self.host_table_header = append_spaces('Username', 22) + append_spaces('Domain', 52) + append_spaces('Port', 12) + append_spaces(
+            'Category', 30)
+
+        self.host_table_length = len(self.host_table_header)
 
     def refresh(self):
         self.window.refresh()
@@ -223,24 +239,29 @@ class Screen(object):
     def get_height(self):
         return self.window.getmaxyx()[0]
 
+    def display_logo(self):
+        for i in range(len(self.logo_content)):
+            self.window.addstr(i + 1, 1, self.logo_content[i])
+
     def display_header(self):
-        txt = append_spaces('Username', 22) + append_spaces('Domain', 52) + append_spaces('Port', 12) + append_spaces(
-            'Category', 30)
-        self.window.addstr(1, 1, txt)
-        self.window.hline(2, 1, '-', len(txt))
+        self.window.hline(self.logo_height, 1, '-', self.host_table_length)
+        self.window.addstr(self.logo_height + 1, 1, self.host_table_header)
+        self.window.hline(self.logo_height + 2, 1, '-', self.host_table_length)
 
     def display_hosts(self, hosts, sidx, multi_selected_hosts=None):
         for i in range(len(hosts)):
             host = hosts[i]
             if i == sidx:
-                self.window.addstr(i + 4, 1, host.content(), curses.A_STANDOUT)
+                self.window.addstr(i + 4 + self.logo_height, 1, host.content(), curses.A_STANDOUT)
             elif multi_selected_hosts is not None and host.belongs_to(multi_selected_hosts):
-                self.window.addstr(i + 4, 1, host.content(), curses.A_STANDOUT)
+                self.window.addstr(i + 4 + self.logo_height, 1, host.content(), curses.A_STANDOUT)
             else:
-                self.window.addstr(i + 4, 1, host.content())
+                self.window.addstr(i + 4 + self.logo_height, 1, host.content())
 
     def display_search_box(self):
         h = self.get_height()
+        self.window.hline(h-5, 1, '-', self.host_table_length)
+
         if not self.search_mode:
             if self.admin_mode:
                 self.window.addstr(h - 2, 1, '[/] Enter SEARCH mode| [ENTER] Connect| [Shift+i] View Host| [q] Quit')
@@ -256,6 +277,7 @@ class Screen(object):
     def redraw(self, hosts, sidx, multi_selected_hosts=None):
         self.clear()
         self.window.border(0)
+        self.display_logo()
         self.display_header()
         self.display_hosts(hosts, sidx, multi_selected_hosts)
         self.display_search_box()
@@ -285,9 +307,83 @@ class Screen(object):
             else:
                 open_ssh_in_tmux(host)
 
+    def show_log_files(self, logman):
+        assert isinstance(logman, LogManager)
+
+        dpw = self.display_log_panel.window()
+        dpw.clear()
+        dpw.border(0)
+
+        dpw.addstr(1, 1, 'User activities records:')
+        all_logs = logman.files
+        for i in range(len(all_logs)):
+            lf = all_logs[i]
+            if i == logman.selected_index:
+                dpw.addstr(i + 4, 1, lf, curses.A_STANDOUT)
+            else:
+                dpw.addstr(i + 4, 1, lf)
+        dpw.refresh()
+
+    def show_logs_panel(self, logman):
+        assert isinstance(logman, LogManager)
+        self.show_log_files(logman)
+
+        dpw = self.display_log_panel.window()
+        while True:
+            key = dpw.getch()
+            if key == 27:
+                break
+            elif key == 10:
+                lf = logman.current()
+                if lf is not None:
+                    playback_asciinema_log_in_tmux('../asciinema_logs/%s' % lf)
+
+            elif key == curses.KEY_UP:
+                logman.move_up()
+                self.show_log_files(logman)
+
+            elif key == curses.KEY_DOWN:
+                logman.move_down()
+                self.show_log_files(logman)
+
+        self.display_log_panel.hide()
+
+
+class LogManager(object):
+    def __init__(self, folder):
+        self.folder = folder
+        self.files = []
+        self.total = 0
+        self.selected_index = 0
+
+    def reload(self):
+        try:
+            tmp = list()
+            all_logs = os.listdir(self.folder)
+            self.total = len(all_logs)
+            for log in all_logs:
+                if log.endswith('.log'):
+                    tmp.append(log)
+
+            self.files = tmp
+        except Exception as e:
+            pass
+
+    def move_down(self):
+        self.selected_index = (self.selected_index + 1) % self.total
+
+    def move_up(self):
+        self.selected_index = (self.selected_index - 1) % self.total
+
+    def current(self):
+        if self.selected_index < self.total:
+            return self.files[self.selected_index]
+        else:
+            return None
+
 
 class Bastion(object):
-    def __init__(self, picker, screen, sid, admin_mode=False):
+    def __init__(self, picker, screen, sid, admin_mode=False, log_man=None):
         assert isinstance(picker, Picker)
         assert isinstance(screen, Screen)
 
@@ -296,8 +392,10 @@ class Bastion(object):
         self.tmux_name = 'bastion-' + sid
         self.multi_select = False
         self.admin_mode = admin_mode
+        self.log_man = log_man
 
     def start(self):
+        self.screen.display_logo()
         self.screen.display_header()
         self.screen.display_hosts(self.picker.all_hosts(), self.picker.selected_index)
         self.screen.display_search_box()
@@ -307,6 +405,9 @@ class Bastion(object):
     def event_loop(self):
         while True:
             key = self.screen.getch()
+
+            if key == -1:  # Timeout
+                break
 
             if self.multi_select and key != curses.KEY_DOWN and key != 10:
                 self.multi_select = False
@@ -364,6 +465,10 @@ class Bastion(object):
                     self.screen.enter_search_mode()
                     self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
+                #elif key == ord('L') and self.admin_mode:  # Press Shift+L
+                #    self.log_man.reload()
+                #    self.screen.show_logs_panel(self.log_man)
+
     def start_event_loop(self):
         try:
             self.event_loop()
@@ -414,7 +519,7 @@ class Bastion(object):
 
         elif key == curses.KEY_RESIZE:
             pass
-        
+
         elif key == ord('I'):  # Press Shift+i
             curses.beep()
             host = self.picker.current()
@@ -438,17 +543,21 @@ class Bastion(object):
                 self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
 
-def bootstrap(sid, admin_mode=False):
+def bootstrap(sid, admin_mode=False, logo_content=[]):
     window = curses.initscr()
     window.border(0)
     curses.noecho()
     curses.cbreak()
     window.keypad(1)
+    window.timeout(config.idle_period)
 
-    screen = Screen(window, admin_mode)
+    screen = Screen(window, admin_mode, logo_content)
 
     picker = Picker()
     picker.load_config()
+
+    #log_man = LogManager('../asciinema_logs')
+    #Bastion(picker, screen, sid, admin_mode, log_man).start()
 
     Bastion(picker, screen, sid, admin_mode).start()
 

@@ -4,6 +4,7 @@ __author__ = 'hoang281283@gmail.com'
 
 import sys
 from core import bastion
+from core.logo import logo_content
 
 admin_mode = False
 if len(sys.argv) > 2:
@@ -11,4 +12,4 @@ if len(sys.argv) > 2:
 
 sid = sys.argv[1]
 
-bastion.bootstrap(sid, admin_mode)
+bastion.bootstrap(sid, admin_mode, logo_content)

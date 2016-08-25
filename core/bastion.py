@@ -541,6 +541,7 @@ def bootstrap(sid, admin_mode=False, logo_content=[]):
     window.border(0)
     curses.noecho()
     curses.cbreak()
+    curses.curs_set(0)
     window.keypad(1)
     window.timeout(config.idle_period)
 

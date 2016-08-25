@@ -550,6 +550,7 @@ def bootstrap(sid, admin_mode=False, logo_content=[]):
     cat_picker = Picker()
 
     categories = {}
+    cate_ALL = Category('_ALL_')
 
     for i in range(len(config.hosts)):
         host = config.hosts[i]
@@ -561,6 +562,7 @@ def bootstrap(sid, admin_mode=False, logo_content=[]):
         record = host.get('record', config.default_record)
 
         sshcp = SSHConnectParam(str(i), user, domain, port, category, desc, record)
+        cate_ALL.add_host(sshcp)
 
         cate_names = [x.strip() for x in category.split(',')]
         for cate_name in cate_names:
@@ -574,7 +576,8 @@ def bootstrap(sid, admin_mode=False, logo_content=[]):
     categos_as_list = list()
     for sk in sorted_keys:
         categos_as_list.append(categories.get(sk))
-        
+    categos_as_list.append(cate_ALL)
+
     if len(categos_as_list) > 0:
         picker.initialize(categos_as_list[0].total_hosts)
         cat_picker.initialize(categos_as_list)

@@ -363,10 +363,10 @@ class Bastion(object):
     def start(self):
         self.screen.display_logo()
         if self.showing_cat:
-            self.screen.display_categories(self.cat_picker.all_items(), self.cat_picker.selected_index)
+            self.screen.display_categories(self.cat_picker.viewport_items(), self.cat_picker.selected_index)
         else:
             self.screen.display_header()
-            self.screen.display_hosts(self.picker.all_items(), self.picker.selected_index)
+            self.screen.display_hosts(self.picker.viewport_items(), self.picker.selected_index)
             self.screen.display_search_box()
 
         self.start_event_loop()
@@ -395,11 +395,11 @@ class Bastion(object):
             else:
                 if key == curses.KEY_LEFT:
                     self.showing_cat = True
-                    self.screen.redraw(self.picker.all_items(), self.picker.selected_index, self.picker.ms_items(), True, self.cat_picker.all_items(), self.cat_picker.selected_index)
+                    self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index, self.picker.ms_items(), True, self.cat_picker.viewport_items(), self.cat_picker.selected_index)
 
                 elif key == curses.KEY_UP:
                     self.picker.move_up()
-                    self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
+                    self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
 
                 elif key == curses.KEY_DOWN:
                     self.picker.move_down()
@@ -408,9 +408,9 @@ class Bastion(object):
                         host = self.picker.current()
                         if host is not None:
                             self.picker.multi_selected_items.append(host)
-                        self.screen.redraw(self.picker.all_items(), self.picker.selected_index, self.picker.ms_items())
+                        self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index, self.picker.ms_items())
                     else:
-                        self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
+                        self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
 
                 elif key == 10: # Press Enter
                     if self.multi_select:
@@ -438,7 +438,7 @@ class Bastion(object):
 
                 elif key == 47:  # Press '/'
                     self.screen.enter_search_mode()
-                    self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
+                    self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
 
                 #elif key == ord('L') and self.admin_mode:  # Press Shift+L
                 #    self.log_man.reload()
@@ -459,11 +459,11 @@ class Bastion(object):
     def handle_event_in_showing_category_mode(self, key):
         if key == curses.KEY_UP:
             self.cat_picker.move_up()
-            self.screen.redraw(showing_cat=True, categories=self.cat_picker.all_items(), cat_sidx=self.cat_picker.selected_index)
+            self.screen.redraw(showing_cat=True, categories=self.cat_picker.viewport_items(), cat_sidx=self.cat_picker.selected_index)
 
         elif key == curses.KEY_DOWN:
             self.cat_picker.move_down()
-            self.screen.redraw(showing_cat=True, categories=self.cat_picker.all_items(), cat_sidx=self.cat_picker.selected_index)
+            self.screen.redraw(showing_cat=True, categories=self.cat_picker.viewport_items(), cat_sidx=self.cat_picker.selected_index)
 
         elif key == 10: # Press Enter
             cate = self.cat_picker.current()
@@ -472,17 +472,17 @@ class Bastion(object):
             if cate is not None:
                 self.showing_cat = False
                 self.picker.initialize(cate.total_hosts)
-                self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
+                self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
 
     def handle_event_in_search_mode(self, key):
         if key == 27:  # Press 'ESC'
             self.screen.exit_search_mode()
             self.picker.reset()
-            self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
+            self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
 
         elif key == curses.KEY_UP:
             self.picker.move_up()
-            self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
+            self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
 
         elif key == curses.KEY_DOWN:
             self.picker.move_down()
@@ -491,9 +491,9 @@ class Bastion(object):
                 host = self.picker.current()
                 if host is not None:
                     self.picker.multi_selected_items.append(host)
-                self.screen.redraw(self.picker.all_items(), self.picker.selected_index, self.picker.ms_items())
+                self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index, self.picker.ms_items())
             else:
-                self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
+                self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
 
         elif key == 10: # Press Enter
             if self.multi_select:
@@ -524,7 +524,7 @@ class Bastion(object):
             hosts = self.picker.search(self.screen.search_txt)
             self.picker.update(hosts, 0)
 
-            self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
+            self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
 
         elif key < 256:
             c = chr(key)
@@ -533,7 +533,7 @@ class Bastion(object):
                 hosts = self.picker.search(self.screen.search_txt)
                 self.picker.update(hosts, 0)
 
-                self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
+                self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
 
 
 def bootstrap(sid, admin_mode=False, logo_content=[]):
@@ -547,8 +547,8 @@ def bootstrap(sid, admin_mode=False, logo_content=[]):
 
     screen = Screen(window, admin_mode, logo_content)
 
-    picker = Picker()
-    cat_picker = Picker()
+    picker = Picker(10)
+    cat_picker = Picker(20)
 
     categories = {}
     cate_ALL = Category('_ALL_')

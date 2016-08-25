@@ -8,6 +8,7 @@ import os
 import datetime
 import config
 import time
+from picker import Picker
 
 
 def execute_cmd(cmd):
@@ -72,71 +73,6 @@ def append_spaces(text, length):
         return text
     else:
         return text + ' ' * (length - size)
-
-
-class Picker(object):
-    def __init__(self):
-        self.total = 0
-        self.selected_index = 0
-        self.items = []
-        self.loaded_items = []
-        self.total_loaded = 0
-        self.multi_selected_items = []
-
-    def initialize(self, items):
-        self.loaded_items = list() + items
-        self.total_loaded = len(items)
-        self.items = list() + items
-        self.total = len(items)
-
-    def all_items(self):
-        return self.items
-
-    def current(self):
-        if len(self.items) > self.selected_index:
-            return self.items[self.selected_index]
-        else:
-            return None
-
-    def move_down(self):
-        self.selected_index = (self.selected_index + 1) % self.total
-
-    def move_up(self):
-        self.selected_index = (self.selected_index - 1) % self.total
-
-    def update(self, hosts, selected_idx):
-        self.items = hosts
-        self.total = len(self.items)
-        self.selected_index = selected_idx
-
-    def reset(self):
-        self.items = self.loaded_items
-        self.total = self.total_loaded
-        self.selected_index = 0
-
-    def search(self, exp):
-        ret = list()
-        for item in self.loaded_items:
-            if item.contain(exp):
-                ret.append(item)
-
-        return ret
-
-    def multi_select_add(self, item):
-        self.multi_selected_items.append(item)
-
-    def enter_multi_select(self):
-        self.multi_selected_items = []
-        item = self.current()
-        if item is not None:
-            self.multi_selected_items.append(item)
-
-    def exit_multi_select(self):
-        self.multi_selected_items = []
-
-    def ms_items(self):
-        ret = list() + self.multi_selected_items
-        return ret
 
 
 class Category(object):
@@ -626,15 +562,19 @@ def bootstrap(sid, admin_mode=False, logo_content=[]):
 
         sshcp = SSHConnectParam(str(i), user, domain, port, category, desc, record)
 
-        cate = categories.get(category, None)
-        if cate is None:
-            cate = Category(category)
-            categories[category] = cate
+        cate_names = [x.strip() for x in category.split(',')]
+        for cate_name in cate_names:
+            cate = categories.get(cate_name, None)
+            if cate is None:
+                cate = Category(cate_name)
+                categories[cate_name] = cate
+            cate.add_host(sshcp)
 
-        cate.add_host(sshcp)
-
-    categos_as_list = categories.values()
-
+    sorted_keys = sorted(categories.keys())
+    categos_as_list = list()
+    for sk in sorted_keys:
+        categos_as_list.append(categories.get(sk))
+        
     if len(categos_as_list) > 0:
         picker.initialize(categos_as_list[0].total_hosts)
         cat_picker.initialize(categos_as_list)

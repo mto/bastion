@@ -385,15 +385,15 @@ class Bastion(object):
                 self.multi_select = True
                 self.picker.enter_multi_select()
 
+            if self.admin_mode and key == 113:  # Quit q
+                break
+
             if self.showing_cat:
                 self.handle_event_in_showing_category_mode(key)
             elif self.screen.search_mode:
                 self.handle_event_in_search_mode(key)
             else:
-                if self.admin_mode and key == 113:  # Quit q
-                    break
-
-                elif key == curses.KEY_LEFT:
+                if key == curses.KEY_LEFT:
                     self.showing_cat = True
                     self.screen.redraw(self.picker.all_items(), self.picker.selected_index, self.picker.ms_items(), True, self.cat_picker.all_items(), self.cat_picker.selected_index)
 

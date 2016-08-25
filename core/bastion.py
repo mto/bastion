@@ -78,23 +78,23 @@ class Picker(object):
     def __init__(self):
         self.total = 0
         self.selected_index = 0
-        self.hosts = []
-        self.loaded_hosts = []
+        self.items = []
+        self.loaded_items = []
         self.total_loaded = 0
-        self.multi_selected_hosts = []
+        self.multi_selected_items = []
 
     def initialize(self, items):
-        self.loaded_hosts = list() + items
+        self.loaded_items = list() + items
         self.total_loaded = len(items)
-        self.hosts = list() + items
+        self.items = list() + items
         self.total = len(items)
 
-    def all_hosts(self):
-        return self.hosts
+    def all_items(self):
+        return self.items
 
     def current(self):
-        if len(self.hosts) > self.selected_index:
-            return self.hosts[self.selected_index]
+        if len(self.items) > self.selected_index:
+            return self.items[self.selected_index]
         else:
             return None
 
@@ -105,37 +105,37 @@ class Picker(object):
         self.selected_index = (self.selected_index - 1) % self.total
 
     def update(self, hosts, selected_idx):
-        self.hosts = hosts
-        self.total = len(self.hosts)
+        self.items = hosts
+        self.total = len(self.items)
         self.selected_index = selected_idx
 
     def reset(self):
-        self.hosts = self.loaded_hosts
+        self.items = self.loaded_items
         self.total = self.total_loaded
         self.selected_index = 0
 
     def search(self, exp):
         ret = list()
-        for host in self.loaded_hosts:
-            if host.contain(exp):
-                ret.append(host)
+        for item in self.loaded_items:
+            if item.contain(exp):
+                ret.append(item)
 
         return ret
 
-    def multi_select_add(self, host):
-        self.multi_selected_hosts.append(host)
+    def multi_select_add(self, item):
+        self.multi_selected_items.append(item)
 
     def enter_multi_select(self):
-        self.multi_selected_hosts = []
-        host = self.current()
-        if host is not None:
-            self.multi_selected_hosts.append(host)
+        self.multi_selected_items = []
+        item = self.current()
+        if item is not None:
+            self.multi_selected_items.append(item)
 
     def exit_multi_select(self):
-        self.multi_selected_hosts = []
+        self.multi_selected_items = []
 
-    def ms_hosts(self):
-        ret = list() + self.multi_selected_hosts
+    def ms_items(self):
+        ret = list() + self.multi_selected_items
         return ret
 
 
@@ -427,10 +427,10 @@ class Bastion(object):
     def start(self):
         self.screen.display_logo()
         if self.showing_cat:
-            self.screen.display_categories(self.cat_picker.all_hosts(), self.cat_picker.selected_index)
+            self.screen.display_categories(self.cat_picker.all_items(), self.cat_picker.selected_index)
         else:
             self.screen.display_header()
-            self.screen.display_hosts(self.picker.all_hosts(), self.picker.selected_index)
+            self.screen.display_hosts(self.picker.all_items(), self.picker.selected_index)
             self.screen.display_search_box()
 
         self.start_event_loop()
@@ -459,11 +459,11 @@ class Bastion(object):
 
                 elif key == curses.KEY_LEFT:
                     self.showing_cat = True
-                    self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index, self.picker.ms_hosts(), True, self.cat_picker.all_hosts(), self.cat_picker.selected_index)
+                    self.screen.redraw(self.picker.all_items(), self.picker.selected_index, self.picker.ms_items(), True, self.cat_picker.all_items(), self.cat_picker.selected_index)
 
                 elif key == curses.KEY_UP:
                     self.picker.move_up()
-                    self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+                    self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
 
                 elif key == curses.KEY_DOWN:
                     self.picker.move_down()
@@ -471,15 +471,15 @@ class Bastion(object):
                     if self.multi_select:
                         host = self.picker.current()
                         if host is not None:
-                            self.picker.multi_selected_hosts.append(host)
-                        self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index, self.picker.ms_hosts())
+                            self.picker.multi_selected_items.append(host)
+                        self.screen.redraw(self.picker.all_items(), self.picker.selected_index, self.picker.ms_items())
                     else:
-                        self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+                        self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
 
                 elif key == 10: # Press Enter
                     if self.multi_select:
                         self.multi_select = False
-                        ms_hosts = self.picker.ms_hosts()
+                        ms_hosts = self.picker.ms_items()
                         self.picker.exit_multi_select()
                         if len(ms_hosts) > 0:
                             open_multi_ssh_in_tmux(ms_hosts)
@@ -502,7 +502,7 @@ class Bastion(object):
 
                 elif key == 47:  # Press '/'
                     self.screen.enter_search_mode()
-                    self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+                    self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
 
                 #elif key == ord('L') and self.admin_mode:  # Press Shift+L
                 #    self.log_man.reload()
@@ -523,11 +523,11 @@ class Bastion(object):
     def handle_event_in_showing_category_mode(self, key):
         if key == curses.KEY_UP:
             self.cat_picker.move_up()
-            self.screen.redraw(showing_cat=True, categories=self.cat_picker.all_hosts(), cat_sidx=self.cat_picker.selected_index)
+            self.screen.redraw(showing_cat=True, categories=self.cat_picker.all_items(), cat_sidx=self.cat_picker.selected_index)
 
         elif key == curses.KEY_DOWN:
             self.cat_picker.move_down()
-            self.screen.redraw(showing_cat=True, categories=self.cat_picker.all_hosts(), cat_sidx=self.cat_picker.selected_index)
+            self.screen.redraw(showing_cat=True, categories=self.cat_picker.all_items(), cat_sidx=self.cat_picker.selected_index)
 
         elif key == 10: # Press Enter
             cate = self.cat_picker.current()
@@ -536,17 +536,17 @@ class Bastion(object):
             if cate is not None:
                 self.showing_cat = False
                 self.picker.initialize(cate.total_hosts)
-                self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+                self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
 
     def handle_event_in_search_mode(self, key):
         if key == 27:  # Press 'ESC'
             self.screen.exit_search_mode()
             self.picker.reset()
-            self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+            self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
 
         elif key == curses.KEY_UP:
             self.picker.move_up()
-            self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+            self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
 
         elif key == curses.KEY_DOWN:
             self.picker.move_down()
@@ -554,15 +554,15 @@ class Bastion(object):
             if self.multi_select:
                 host = self.picker.current()
                 if host is not None:
-                    self.picker.multi_selected_hosts.append(host)
-                self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index, self.picker.ms_hosts())
+                    self.picker.multi_selected_items.append(host)
+                self.screen.redraw(self.picker.all_items(), self.picker.selected_index, self.picker.ms_items())
             else:
-                self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+                self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
 
         elif key == 10: # Press Enter
             if self.multi_select:
                 self.multi_select = False
-                ms_hosts = self.picker.ms_hosts()
+                ms_hosts = self.picker.ms_items()
                 self.picker.exit_multi_select()
                 if len(ms_hosts) > 0:
                     open_multi_ssh_in_tmux(ms_hosts)
@@ -588,7 +588,7 @@ class Bastion(object):
             hosts = self.picker.search(self.screen.search_txt)
             self.picker.update(hosts, 0)
 
-            self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+            self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
 
         elif key < 256:
             c = chr(key)
@@ -597,7 +597,7 @@ class Bastion(object):
                 hosts = self.picker.search(self.screen.search_txt)
                 self.picker.update(hosts, 0)
 
-                self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
+                self.screen.redraw(self.picker.all_items(), self.picker.selected_index)
 
 
 def bootstrap(sid, admin_mode=False, logo_content=[]):

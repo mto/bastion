@@ -139,6 +139,24 @@ class Picker(object):
         return ret
 
 
+class Category(object):
+    def __init__(self, name):
+        self.name = name
+        self.total_hosts = []
+        self.count = 0
+
+    def content(self):
+        name = append_spaces(self.name, 20)
+        total = append_spaces(str(self.count), 10)
+
+        return ' %s  %s' % (name, total)
+
+    def add_host(self, host):
+        if isinstance(host, SSHConnectParam):
+            self.total_hosts.append(host)
+            self.count += 1
+
+
 class SSHConnectParam(object):
     def __init__(self, number, user, domain, port, category, desc, record=False):
         self.number = number
@@ -196,7 +214,6 @@ class Screen(object):
         self.logo_height = len(self.logo_content) + 2
         self.host_table_header = append_spaces('Username', 22) + append_spaces('Domain', 52) + append_spaces('Port', 12) + append_spaces(
             'Category', 30)
-
         self.host_table_length = len(self.host_table_header)
 
     def refresh(self):
@@ -234,10 +251,21 @@ class Screen(object):
         for i in range(len(self.logo_content)):
             self.window.addstr(i + 1, 1, self.logo_content[i])
 
-    def display_header(self):
-        self.window.hline(self.logo_height, 1, '-', self.host_table_length)
-        self.window.addstr(self.logo_height + 1, 1, self.host_table_header)
-        self.window.hline(self.logo_height + 2, 1, '-', self.host_table_length)
+    def display_header(self, showing_cat=True):
+        if showing_cat:
+            pass
+        else:
+            self.window.hline(self.logo_height, 1, '-', self.host_table_length)
+            self.window.addstr(self.logo_height + 1, 1, self.host_table_header)
+            self.window.hline(self.logo_height + 2, 1, '-', self.host_table_length)
+
+    def display_categories(self, categories, sidx):
+        for i in range(len(categories)):
+            cat = categories[i]
+            if i == sidx:
+                self.window.addstr(i + 4 + self.logo_height, 1, cat.content(), curses.A_STANDOUT)
+            else:
+                self.window.addstr(i + 4 + self.logo_height, 1, cat.content())
 
     def display_hosts(self, hosts, sidx, multi_selected_hosts=None):
         for i in range(len(hosts)):
@@ -249,7 +277,10 @@ class Screen(object):
             else:
                 self.window.addstr(i + 4 + self.logo_height, 1, host.content())
 
-    def display_search_box(self):
+    def display_search_box(self, showing_cat=True):
+        if showing_cat:
+            return
+
         h = self.get_height()
         self.window.hline(h-5, 1, '-', self.host_table_length)
 
@@ -265,14 +296,19 @@ class Screen(object):
             self.window.addstr(h - 2, 1, txt)
             self.window.addstr(h - 4, 1, self.search_txt)
 
-    def redraw(self, hosts, sidx, multi_selected_hosts=None):
+    def redraw(self, hosts=None, sidx=0, multi_selected_hosts=None, showing_cat=False, categories=None, cat_sidx=None):
         self.clear()
         self.window.border(0)
-        self.display_logo()
-        self.display_header()
-        self.display_hosts(hosts, sidx, multi_selected_hosts)
-        self.display_search_box()
-        self.refresh()
+        if showing_cat:
+            self.display_logo()
+            self.display_categories(categories, cat_sidx)
+            self.refresh()
+        else:
+            self.display_logo()
+            self.display_header(False)
+            self.display_hosts(hosts, sidx, multi_selected_hosts)
+            self.display_search_box(False)
+            self.refresh()
 
     def show_host_detail(self, host):
         assert isinstance(host, SSHConnectParam)
@@ -374,7 +410,7 @@ class LogManager(object):
 
 
 class Bastion(object):
-    def __init__(self, picker, screen, sid, admin_mode=False, log_man=None):
+    def __init__(self, picker, cat_picker, screen, sid, admin_mode=False, log_man=None):
         assert isinstance(picker, Picker)
         assert isinstance(screen, Screen)
 
@@ -385,12 +421,17 @@ class Bastion(object):
         self.admin_mode = admin_mode
         self.log_man = log_man
         self.start_time = int(time.time()*1000)
+        self.cat_picker = cat_picker
+        self.showing_cat = True
 
     def start(self):
         self.screen.display_logo()
-        self.screen.display_header()
-        self.screen.display_hosts(self.picker.all_hosts(), self.picker.selected_index)
-        self.screen.display_search_box()
+        if self.showing_cat:
+            self.screen.display_categories(self.cat_picker.all_hosts(), self.cat_picker.selected_index)
+        else:
+            self.screen.display_header()
+            self.screen.display_hosts(self.picker.all_hosts(), self.picker.selected_index)
+            self.screen.display_search_box()
 
         self.start_event_loop()
 
@@ -408,11 +449,17 @@ class Bastion(object):
                 self.multi_select = True
                 self.picker.enter_multi_select()
 
-            if self.screen.search_mode:
+            if self.showing_cat:
+                self.handle_event_in_showing_category_mode(key)
+            elif self.screen.search_mode:
                 self.handle_event_in_search_mode(key)
             else:
                 if self.admin_mode and key == 113:  # Quit q
                     break
+
+                elif key == curses.KEY_LEFT:
+                    self.showing_cat = True
+                    self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index, self.picker.ms_hosts(), True, self.cat_picker.all_hosts(), self.cat_picker.selected_index)
 
                 elif key == curses.KEY_UP:
                     self.picker.move_up()
@@ -472,6 +519,24 @@ class Bastion(object):
             curses.echo()
             curses.endwin()
             kill_tmux_session(self.tmux_name)
+
+    def handle_event_in_showing_category_mode(self, key):
+        if key == curses.KEY_UP:
+            self.cat_picker.move_up()
+            self.screen.redraw(showing_cat=True, categories=self.cat_picker.all_hosts(), cat_sidx=self.cat_picker.selected_index)
+
+        elif key == curses.KEY_DOWN:
+            self.cat_picker.move_down()
+            self.screen.redraw(showing_cat=True, categories=self.cat_picker.all_hosts(), cat_sidx=self.cat_picker.selected_index)
+
+        elif key == 10: # Press Enter
+            cate = self.cat_picker.current()
+            assert isinstance(cate, Category)
+
+            if cate is not None:
+                self.showing_cat = False
+                self.picker.initialize(cate.total_hosts)
+                self.screen.redraw(self.picker.all_hosts(), self.picker.selected_index)
 
     def handle_event_in_search_mode(self, key):
         if key == 27:  # Press 'ESC'
@@ -546,23 +611,36 @@ def bootstrap(sid, admin_mode=False, logo_content=[]):
     screen = Screen(window, admin_mode, logo_content)
 
     picker = Picker()
-    hosts = list()
+    cat_picker = Picker()
+
+    categories = {}
+
     for i in range(len(config.hosts)):
         host = config.hosts[i]
         user = host.get('user', config.default_user)
         domain = host.get('domain')
         port = host.get('port', config.default_port)
-        category = host.get('category', 'N/A')
+        category = host.get('category', 'Other')
         desc = host.get('desc', 'N/A')
         record = host.get('record', config.default_record)
 
         sshcp = SSHConnectParam(str(i), user, domain, port, category, desc, record)
-        hosts.append(sshcp)
 
-    picker.initialize(hosts)
+        cate = categories.get(category, None)
+        if cate is None:
+            cate = Category(category)
+            categories[category] = cate
+
+        cate.add_host(sshcp)
+
+    categos_as_list = categories.values()
+
+    if len(categos_as_list) > 0:
+        picker.initialize(categos_as_list[0].total_hosts)
+        cat_picker.initialize(categos_as_list)
 
     #log_man = LogManager('../asciinema_logs')
     #Bastion(picker, screen, sid, admin_mode, log_man).start()
 
-    Bastion(picker, screen, sid, admin_mode).start()
+    Bastion(picker, cat_picker, screen, sid, admin_mode).start()
 

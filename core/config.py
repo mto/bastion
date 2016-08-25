@@ -7,9 +7,9 @@ default_record = True
 idle_period = 3600000
 
 hosts = [
-    {'user': 'toto2', 'domain': '192.168.10.3', 'category': 'API, Nginx', 'desc': 'Blah blah 3'},
-    {'user': 'toto', 'domain': '192.168.10.3', 'category': 'API Servers', 'desc': 'Blah blah 3'},
-    {'user': 'toto', 'domain': '192.168.10.3', 'category': 'API Servers', 'desc': 'Blah blah 3'},
+    {'user': 'toto2', 'domain': '192.168.10.3', 'category': 'API', 'desc': 'Blah blah 3'},
+    {'user': 'toto', 'domain': '192.168.10.3', 'category': 'API', 'desc': 'Blah blah 3'},
+    {'user': 'toto', 'domain': '192.168.10.3', 'category': 'API', 'desc': 'Blah blah 3'},
     {'user': 'toto2', 'domain': '192.168.10.3', 'category': 'Nginx Servers', 'desc': 'Blah blah 3'},
     {'user': 'toto2', 'domain': '192.168.10.4', 'category': 'API Servers', 'desc': 'Blah blah 3'},
     {'user': 'toto1', 'domain': '192.168.10.7', 'category': 'API Servers', 'desc': 'Blah blah 3'},

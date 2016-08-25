@@ -139,7 +139,8 @@ class SSHConnectParam(object):
 
 
 class Screen(object):
-    def __init__(self, window, admin_mode=False, logo_content=[]):
+    def __init__(self, bastion, window, admin_mode=False, logo_content=[]):
+        self.bastion = bastion
         self.window = window
         self.search_mode = False
         self.search_txt = ''
@@ -187,15 +188,18 @@ class Screen(object):
         for i in range(len(self.logo_content)):
             self.window.addstr(i + 1, 1, self.logo_content[i])
 
-    def display_header(self, showing_cat=True):
-        if showing_cat:
+    def display_header(self):
+        if self.bastion.showing_cat:
             pass
         else:
             self.window.hline(self.logo_height, 1, '-', self.host_table_length)
             self.window.addstr(self.logo_height + 1, 1, self.host_table_header)
             self.window.hline(self.logo_height + 2, 1, '-', self.host_table_length)
 
-    def display_categories(self, categories, sidx):
+    def display_categories(self):
+        categories = self.bastion.cat_picker.items
+        sidx = self.bastion.cat_picker.selected_index
+
         for i in range(len(categories)):
             cat = categories[i]
             if i == sidx:
@@ -203,18 +207,31 @@ class Screen(object):
             else:
                 self.window.addstr(i + 4 + self.logo_height, 1, cat.content())
 
-    def display_hosts(self, hosts, sidx, multi_selected_hosts=None):
-        for i in range(len(hosts)):
+    def display_hosts(self):
+        vp_min = self.bastion.picker.viewport_min_idx
+        vp_max = self.bastion.picker.viewport_max_idx
+        hosts = self.bastion.picker.items
+        sidx = self.bastion.picker.selected_index
+        ms_idxs = self.bastion.picker.multi_selected_idxs
+
+        row_idx = 0
+        for i in range(vp_min, vp_max):
             host = hosts[i]
             if i == sidx:
-                self.window.addstr(i + 4 + self.logo_height, 1, host.content(), curses.A_STANDOUT)
-            elif multi_selected_hosts is not None and host.belongs_to(multi_selected_hosts):
-                self.window.addstr(i + 4 + self.logo_height, 1, host.content(), curses.A_STANDOUT)
-            else:
-                self.window.addstr(i + 4 + self.logo_height, 1, host.content())
+                if i in ms_idxs:
+                    self.window.addstr(row_idx + 4 + self.logo_height, 1, host.content() + '    X', curses.A_STANDOUT)
+                else:
+                    self.window.addstr(row_idx + 4 + self.logo_height, 1, host.content(), curses.A_STANDOUT)
 
-    def display_search_box(self, showing_cat=True):
-        if showing_cat:
+            elif self.bastion.multi_select and i in ms_idxs:
+                self.window.addstr(row_idx + 4 + self.logo_height, 1, host.content() + '    X')
+            else:
+                self.window.addstr(row_idx + 4 + self.logo_height, 1, host.content())
+
+            row_idx += 1
+
+    def display_search_box(self):
+        if self.bastion.showing_cat:
             return
 
         h = self.get_height()
@@ -232,18 +249,18 @@ class Screen(object):
             self.window.addstr(h - 2, 1, txt)
             self.window.addstr(h - 4, 1, self.search_txt)
 
-    def redraw(self, hosts=None, sidx=0, multi_selected_hosts=None, showing_cat=False, categories=None, cat_sidx=None):
+    def redraw(self):
         self.clear()
         self.window.border(0)
-        if showing_cat:
+        if self.bastion.showing_cat:
             self.display_logo()
-            self.display_categories(categories, cat_sidx)
+            self.display_categories()
             self.refresh()
         else:
             self.display_logo()
-            self.display_header(False)
-            self.display_hosts(hosts, sidx, multi_selected_hosts)
-            self.display_search_box(False)
+            self.display_header()
+            self.display_hosts()
+            self.display_search_box()
             self.refresh()
 
     def show_host_detail(self, host):
@@ -346,12 +363,11 @@ class LogManager(object):
 
 
 class Bastion(object):
-    def __init__(self, picker, cat_picker, screen, sid, admin_mode=False, log_man=None):
+    def __init__(self, picker, cat_picker, sid, admin_mode=False, log_man=None):
         assert isinstance(picker, Picker)
-        assert isinstance(screen, Screen)
 
         self.picker = picker
-        self.screen = screen
+        self.screen = None
         self.tmux_name = 'bastion-' + sid
         self.multi_select = False
         self.admin_mode = admin_mode
@@ -360,13 +376,17 @@ class Bastion(object):
         self.cat_picker = cat_picker
         self.showing_cat = True
 
+    def inject_screen(self, screen):
+        assert isinstance(screen, Screen)
+        self.screen = screen
+
     def start(self):
         self.screen.display_logo()
         if self.showing_cat:
-            self.screen.display_categories(self.cat_picker.viewport_items(), self.cat_picker.selected_index)
+            self.screen.display_categories()
         else:
             self.screen.display_header()
-            self.screen.display_hosts(self.picker.viewport_items(), self.picker.selected_index)
+            self.screen.display_hosts()
             self.screen.display_search_box()
 
         self.start_event_loop()
@@ -378,13 +398,6 @@ class Bastion(object):
             if key == -1 and (self.start_time + config.idle_period) <= int(time.time()*1000):  # Timeout
                 break
 
-            if self.multi_select and key != curses.KEY_DOWN and key != 10:
-                self.multi_select = False
-
-            if not self.multi_select and key == 32:  # Press on SPACE to enter multi-selection mode
-                self.multi_select = True
-                self.picker.enter_multi_select()
-
             if self.admin_mode and key == 113:  # Quit q
                 break
 
@@ -395,22 +408,15 @@ class Bastion(object):
             else:
                 if key == curses.KEY_LEFT:
                     self.showing_cat = True
-                    self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index, self.picker.ms_items(), True, self.cat_picker.viewport_items(), self.cat_picker.selected_index)
+                    self.screen.redraw()
 
                 elif key == curses.KEY_UP:
                     self.picker.move_up()
-                    self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
+                    self.screen.redraw()
 
                 elif key == curses.KEY_DOWN:
                     self.picker.move_down()
-
-                    if self.multi_select:
-                        host = self.picker.current()
-                        if host is not None:
-                            self.picker.multi_selected_items.append(host)
-                        self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index, self.picker.ms_items())
-                    else:
-                        self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
+                    self.screen.redraw()
 
                 elif key == 10: # Press Enter
                     if self.multi_select:
@@ -427,8 +433,20 @@ class Bastion(object):
                             else:
                                 open_ssh_in_tmux(host)
 
-                elif key == curses.KEY_RESIZE:
-                    pass
+                elif key == ord(' '):
+                    if self.multi_select:
+                        self.picker.multi_select_add(self.picker.selected_index)
+                        self.screen.redraw()
+
+                elif key == ord('M'): # Enter multi-select
+                    if self.multi_select:
+                        self.multi_select = False
+                        self.picker.exit_multi_select()
+                    else:
+                        self.multi_select = True
+                        self.picker.enter_multi_select()
+
+                    self.screen.redraw()
 
                 elif key == ord('I'):  # Press Shift+i
                     curses.beep()
@@ -438,7 +456,7 @@ class Bastion(object):
 
                 elif key == 47:  # Press '/'
                     self.screen.enter_search_mode()
-                    self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
+                    self.screen.redraw()
 
                 #elif key == ord('L') and self.admin_mode:  # Press Shift+L
                 #    self.log_man.reload()
@@ -459,11 +477,11 @@ class Bastion(object):
     def handle_event_in_showing_category_mode(self, key):
         if key == curses.KEY_UP:
             self.cat_picker.move_up()
-            self.screen.redraw(showing_cat=True, categories=self.cat_picker.viewport_items(), cat_sidx=self.cat_picker.selected_index)
+            self.screen.redraw()
 
         elif key == curses.KEY_DOWN:
             self.cat_picker.move_down()
-            self.screen.redraw(showing_cat=True, categories=self.cat_picker.viewport_items(), cat_sidx=self.cat_picker.selected_index)
+            self.screen.redraw()
 
         elif key == 10: # Press Enter
             cate = self.cat_picker.current()
@@ -471,29 +489,22 @@ class Bastion(object):
 
             if cate is not None:
                 self.showing_cat = False
-                self.picker.initialize(cate.total_hosts)
-                self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
+                self.picker.update(cate.total_hosts, 0)
+                self.screen.redraw()
 
     def handle_event_in_search_mode(self, key):
         if key == 27:  # Press 'ESC'
             self.screen.exit_search_mode()
             self.picker.reset()
-            self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
+            self.screen.redraw()
 
         elif key == curses.KEY_UP:
             self.picker.move_up()
-            self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
+            self.screen.redraw()
 
         elif key == curses.KEY_DOWN:
             self.picker.move_down()
-
-            if self.multi_select:
-                host = self.picker.current()
-                if host is not None:
-                    self.picker.multi_selected_items.append(host)
-                self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index, self.picker.ms_items())
-            else:
-                self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
+            self.screen.redraw()
 
         elif key == 10: # Press Enter
             if self.multi_select:
@@ -513,6 +524,14 @@ class Bastion(object):
         elif key == curses.KEY_RESIZE:
             pass
 
+        elif key == ord('M'):
+            if self.multi_select:
+                self.multi_select = False
+                self.picker.exit_multi_select()
+            else:
+                self.multi_select = True
+                self.picker.enter_multi_select()
+
         elif key == ord('I'):  # Press Shift+i
             curses.beep()
             host = self.picker.current()
@@ -524,7 +543,7 @@ class Bastion(object):
             hosts = self.picker.search(self.screen.search_txt)
             self.picker.update(hosts, 0)
 
-            self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
+            self.screen.redraw()
 
         elif key < 256:
             c = chr(key)
@@ -533,7 +552,7 @@ class Bastion(object):
                 hosts = self.picker.search(self.screen.search_txt)
                 self.picker.update(hosts, 0)
 
-                self.screen.redraw(self.picker.viewport_items(), self.picker.selected_index)
+                self.screen.redraw()
 
 
 def bootstrap(sid, admin_mode=False, logo_content=[]):
@@ -545,10 +564,8 @@ def bootstrap(sid, admin_mode=False, logo_content=[]):
     window.keypad(1)
     window.timeout(config.idle_period)
 
-    screen = Screen(window, admin_mode, logo_content)
-
-    picker = Picker(10)
-    cat_picker = Picker(20)
+    picker = Picker(15)
+    cat_picker = Picker(15)
 
     categories = {}
     cate_ALL = Category('_ALL_')
@@ -583,8 +600,9 @@ def bootstrap(sid, admin_mode=False, logo_content=[]):
         picker.initialize(categos_as_list[0].total_hosts)
         cat_picker.initialize(categos_as_list)
 
-    #log_man = LogManager('../asciinema_logs')
-    #Bastion(picker, screen, sid, admin_mode, log_man).start()
+    bastion = Bastion(picker, cat_picker, sid, admin_mode)
+    screen = Screen(bastion, window, admin_mode, logo_content)
+    bastion.inject_screen(screen)
 
-    Bastion(picker, cat_picker, screen, sid, admin_mode).start()
+    bastion.start()
 

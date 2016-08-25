@@ -8,10 +8,11 @@ class Picker(object):
         self.items = []
         self.loaded_items = []
         self.total_loaded = 0
-        self.multi_selected_items = []
+        self.multi_selected_idxs = []
         self.viewport_height = viewport_height
         self.viewport_min_idx = 0
         self.viewport_max_idx = 0
+        self.multi_selected_mode = False
 
     def initialize(self, items):
         self.loaded_items = list() + items
@@ -56,6 +57,9 @@ class Picker(object):
                     self.viewport_min_idx -= 1
 
     def update(self, items, selected_idx):
+        self.loaded_items = list() + items
+        self.total_loaded = len(self.items)
+
         self.items = items
         self.total = len(self.items)
         self.selected_index = selected_idx
@@ -66,6 +70,8 @@ class Picker(object):
         self.items = self.loaded_items
         self.total = self.total_loaded
         self.selected_index = 0
+        self.viewport_min_idx = 0
+        self.viewport_max_idx = min(self.total_loaded, self.viewport_height)
 
     def search(self, exp):
         ret = list()
@@ -75,19 +81,22 @@ class Picker(object):
 
         return ret
 
-    def multi_select_add(self, item):
-        self.multi_selected_items.append(item)
+    def multi_select_add(self, idx):
+        if self.multi_selected_mode and idx not in self.multi_selected_idxs:
+            self.multi_selected_idxs.append(idx)
 
     def enter_multi_select(self):
-        self.multi_selected_items = []
-        item = self.current()
-        if item is not None:
-            self.multi_selected_items.append(item)
+        self.multi_selected_mode = True
+        self.multi_selected_idxs = [self.selected_index]
 
     def exit_multi_select(self):
-        self.multi_selected_items = []
+        self.multi_selected_mode = False
+        self.multi_selected_idxs = []
+
+    def ms_idxs(self):
+        return sorted(self.multi_selected_idxs)
 
     def ms_items(self):
-        ret = list() + self.multi_selected_items
-        return ret
-
+        ret = list()
+        for i in self.ms_idxs():
+            ret.append(self.items[i])

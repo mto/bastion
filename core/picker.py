@@ -94,9 +94,15 @@ class Picker(object):
         self.multi_selected_idxs = []
 
     def ms_idxs(self):
-        return sorted(self.multi_selected_idxs)
+        if self.multi_selected_mode:
+            return sorted(self.multi_selected_idxs)
+        else:
+            return list()
 
     def ms_items(self):
         ret = list()
         for i in self.ms_idxs():
-            ret.append(self.items[i])
+            if i < self.total:
+                ret.append(self.items[i])
+
+        return ret

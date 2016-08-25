@@ -152,6 +152,8 @@ class Screen(object):
         self.host_table_header = append_spaces('Username', 22) + append_spaces('Domain', 52) + append_spaces('Port', 12) + append_spaces(
             'Category', 30)
         self.host_table_length = len(self.host_table_header)
+        self.cat_table_header = append_spaces('Category', 22) + append_spaces('Number of Hosts', 52)
+        self.cat_table_length = len(self.cat_table_header)
 
     def refresh(self):
         self.window.refresh()
@@ -190,7 +192,10 @@ class Screen(object):
 
     def display_header(self):
         if self.bastion.showing_cat:
-            pass
+            self.window.hline(self.logo_height, 1, '-', self.cat_table_length)
+            self.window.addstr(self.logo_height + 1, 1, self.cat_table_header)
+            self.window.hline(self.logo_height + 2, 1, '-', self.cat_table_length)
+
         else:
             self.window.hline(self.logo_height, 1, '-', self.host_table_length)
             self.window.addstr(self.logo_height + 1, 1, self.host_table_header)
@@ -231,30 +236,37 @@ class Screen(object):
             row_idx += 1
 
     def display_search_box(self):
-        if self.bastion.showing_cat:
-            return
-
         h = self.get_height()
-        self.window.hline(h-5, 1, '-', self.host_table_length)
-
-        if not self.search_mode:
+        if self.bastion.showing_cat:
+            self.window.hline(h-5, 1, '-', self.cat_table_length)
+            txt = '[ENTER] Show Hosts'
             if self.admin_mode:
-                self.window.addstr(h - 2, 1, '[/] Enter SEARCH mode| [ENTER] Connect| [Shift+i] View Host| [q] Quit')
-            else:
-                self.window.addstr(h - 2, 1, '[/] Enter SEARCH mode| [ENTER] Connect| [Shift+i] View Host')
+                txt = '[ENTER] Show Hosts| [q] Quit'
+            self.window.addstr(h - 2, 1, txt)
 
         else:
-            txt = '[SEARCH MODE]: Type something to search' \
-                  '| [ENTER] Connect| [Shift+i] View Host |[ESC]: Exit Search Mode'
-            self.window.addstr(h - 2, 1, txt)
-            self.window.addstr(h - 4, 1, self.search_txt)
+            self.window.hline(h-5, 1, '-', self.host_table_length)
+
+            if not self.search_mode:
+                if self.admin_mode:
+                    self.window.addstr(h - 2, 1, '[/] SEARCH mode| [ENTER] Connect| [Shift+i] View Host| [Shift+m] Multi Select | [q] Quit')
+                else:
+                    self.window.addstr(h - 2, 1, '[/] Enter SEARCH mode| [ENTER] Connect| [Shift+i] View Host| [Shift+m] Multi Select')
+
+            else:
+                txt = '[SEARCH MODE]: Type something to search' \
+                      '| [ENTER] Connect| [Shift+i] View Host| [Shift+m] Multi Select |[ESC]: Exit SEARCH'
+                self.window.addstr(h - 2, 1, txt)
+                self.window.addstr(h - 4, 1, self.search_txt)
 
     def redraw(self):
         self.clear()
         self.window.border(0)
         if self.bastion.showing_cat:
             self.display_logo()
+            self.display_header()
             self.display_categories()
+            self.display_search_box()
             self.refresh()
         else:
             self.display_logo()
@@ -383,7 +395,9 @@ class Bastion(object):
     def start(self):
         self.screen.display_logo()
         if self.showing_cat:
+            self.screen.display_header()
             self.screen.display_categories()
+            self.screen.display_search_box()
         else:
             self.screen.display_header()
             self.screen.display_hosts()
@@ -420,8 +434,8 @@ class Bastion(object):
 
                 elif key == 10: # Press Enter
                     if self.multi_select:
-                        self.multi_select = False
                         ms_hosts = self.picker.ms_items()
+                        self.multi_select = False
                         self.picker.exit_multi_select()
                         if len(ms_hosts) > 0:
                             open_multi_ssh_in_tmux(ms_hosts)

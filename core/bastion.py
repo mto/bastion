@@ -69,8 +69,12 @@ def open_multi_ssh_in_tmux_panes(hosts):
     else:
         nbw = n / ppw
         for i in range(nbw):
-            open_tmux_window(hosts[i * ppw].connect_title())
-            for j in range(ppw):
+            host = hosts[i*ppw]
+            if host.record:
+                open_ssh_in_tmux_and_record(host)
+            else:
+                open_ssh_in_tmux(host)
+            for j in range(1, ppw):
                 host = hosts[i*ppw+j]
                 if host.record:
                     open_ssh_in_split_pane_and_record(host)
@@ -78,8 +82,14 @@ def open_multi_ssh_in_tmux_panes(hosts):
                     open_ssh_in_split_pane(host)
 
         if n > nbw * ppw:
+            host = hosts[nbw * ppw]
+            if host.record:
+                open_ssh_in_tmux_and_record(host)
+            else:
+                open_ssh_in_tmux(host)
+
             open_tmux_window(hosts[nbw * ppw + 1])
-            for k in range(n - nbw * ppw):
+            for k in range(1, n - nbw * ppw):
                 host = hosts[nbw*ppw+k]
                 if host.record:
                     open_ssh_in_tmux_and_record(host)

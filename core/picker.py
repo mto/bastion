@@ -85,6 +85,10 @@ class Picker(object):
         if self.multi_selected_mode and idx not in self.multi_selected_idxs:
             self.multi_selected_idxs.append(idx)
 
+    def multi_select_pop(self):
+        if self.multi_selected_mode and len(self.multi_selected_idxs) > 0:
+            self.multi_selected_idxs.pop()
+
     def enter_multi_select(self):
         self.multi_selected_mode = True
         self.multi_selected_idxs = [self.selected_index]

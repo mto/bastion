@@ -75,6 +75,10 @@ def append_spaces(text, length):
         return text + ' ' * (length - size)
 
 
+def signint_intercept(signum, frame):
+    pass
+
+
 class Category(object):
     def __init__(self, name):
         self.name = name
@@ -449,7 +453,10 @@ class Bastion(object):
 
                 elif key == ord(' '):
                     if self.multi_select:
-                        self.picker.multi_select_add(self.picker.selected_index)
+                        if self.picker.selected_index in self.picker.multi_selected_idxs:
+                            self.picker.multi_selected_idxs.remove(self.picker.selected_index)
+                        else:
+                            self.picker.multi_select_add(self.picker.selected_index)
                         self.screen.redraw()
 
                 elif key == ord('M'): # Enter multi-select
@@ -520,6 +527,24 @@ class Bastion(object):
             self.picker.move_down()
             self.screen.redraw()
 
+        elif key == ord(' '):
+            if self.multi_select:
+                if self.picker.selected_index in self.picker.multi_selected_idxs:
+                    self.picker.multi_selected_idxs.remove(self.picker.selected_index)
+                else:
+                    self.picker.multi_select_add(self.picker.selected_index)
+                self.screen.redraw()
+
+        elif key == ord('M'): # Enter multi-select
+            if self.multi_select:
+                self.multi_select = False
+                self.picker.exit_multi_select()
+            else:
+                self.multi_select = True
+                self.picker.enter_multi_select()
+
+            self.screen.redraw()
+
         elif key == 10: # Press Enter
             if self.multi_select:
                 self.multi_select = False
@@ -538,14 +563,6 @@ class Bastion(object):
         elif key == curses.KEY_RESIZE:
             pass
 
-        elif key == ord('M'):
-            if self.multi_select:
-                self.multi_select = False
-                self.picker.exit_multi_select()
-            else:
-                self.multi_select = True
-                self.picker.enter_multi_select()
-
         elif key == ord('I'):  # Press Shift+i
             curses.beep()
             host = self.picker.current()
@@ -561,8 +578,10 @@ class Bastion(object):
 
         elif key < 256:
             c = chr(key)
-            if str.isalnum(c) or c == ' ' or c == ',' or c == '.' or c == '&':
-                self.screen.type_search_char(chr(key))
+            if str.isalnum(c) or c == '_' or c == ',' or c == '.' or c == '&':
+                if c == '_':
+                    c = ' '
+                self.screen.type_search_char(c)
                 hosts = self.picker.search(self.screen.search_txt)
                 self.picker.update(hosts, 0)
 
@@ -570,6 +589,12 @@ class Bastion(object):
 
 
 def bootstrap(sid, admin_mode=False, logo_content=[]):
+    import signal
+
+    signal.signal(signal.SIGINT, signint_intercept)
+    signal.signal(signal.SIGQUIT, signint_intercept)
+    signal.signal(signal.SIGTERM, signint_intercept)
+
     window = curses.initscr()
     window.border(0)
     curses.noecho()

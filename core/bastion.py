@@ -24,7 +24,26 @@ def kill_tmux_session(name):
 
 
 def open_tmux_window(title):
-    execute_cmd("tmux new-window -n %s &" % title)
+    execute_cmd("tmux new-window -n %s" % title)
+
+
+def open_ssh_in_split_pane(host):
+    assert isinstance(host, SSHConnectParam)
+    cmd = "tmux split-window '%s ;read'" % host.ssh_command()
+    execute_cmd(cmd)
+
+
+def open_ssh_in_split_pane_and_record(host):
+    assert isinstance(host, SSHConnectParam)
+
+    now = datetime.datetime.now()
+    log_dst = "../asciinema_logs/%s-%s-%s-%s-%s-%s_%s_%s.log" % (
+        host.user, host.domain, now.year, now.month, now.day, now.hour, now.minute, now.second)
+
+    ascii_cmd = "asciinema rec -c '%s' %s" % (host.ssh_command(), log_dst)
+
+    cmd = "tmux split-window \"%s ;read\"" % ascii_cmd
+    execute_cmd(cmd)
 
 
 def open_ssh_in_tmux(host):
@@ -40,6 +59,32 @@ def open_multi_ssh_in_tmux(hosts):
             open_ssh_in_tmux_and_record(host)
         else:
             open_ssh_in_tmux(host)
+
+
+def open_multi_ssh_in_tmux_panes(hosts):
+    n = len(hosts)
+    ppw = config.pane_per_window
+    if ppw == 1:
+        open_multi_ssh_in_tmux(hosts)
+    else:
+        nbw = n / ppw
+        for i in range(nbw):
+            open_tmux_window(hosts[i * ppw].connect_title())
+            for j in range(ppw):
+                host = hosts[i*ppw+j]
+                if host.record:
+                    open_ssh_in_split_pane_and_record(host)
+                else:
+                    open_ssh_in_split_pane(host)
+
+        if n > nbw * ppw:
+            open_tmux_window(hosts[nbw * ppw + 1])
+            for k in range(n - nbw * ppw):
+                host = hosts[nbw*ppw+k]
+                if host.record:
+                    open_ssh_in_tmux_and_record(host)
+                else:
+                    open_ssh_in_split_pane(host)
 
 
 def open_ssh_in_tmux_and_record(host):
@@ -442,7 +487,7 @@ class Bastion(object):
                         self.multi_select = False
                         self.picker.exit_multi_select()
                         if len(ms_hosts) > 0:
-                            open_multi_ssh_in_tmux(ms_hosts)
+                            open_multi_ssh_in_tmux_panes(ms_hosts)
                     else:
                         host = self.picker.current()
                         if host is not None:
@@ -551,7 +596,7 @@ class Bastion(object):
                 ms_hosts = self.picker.ms_items()
                 self.picker.exit_multi_select()
                 if len(ms_hosts) > 0:
-                    open_multi_ssh_in_tmux(ms_hosts)
+                    open_multi_ssh_in_tmux_panes(ms_hosts)
             else:
                 host = self.picker.current()
                 if host is not None:

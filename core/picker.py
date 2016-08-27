@@ -81,6 +81,9 @@ class Picker(object):
 
         return ret
 
+    def multi_select_all(self):
+        self.multi_selected_idxs = range(self.total)
+
     def multi_select_add(self, idx):
         if self.multi_selected_mode and idx not in self.multi_selected_idxs:
             self.multi_selected_idxs.append(idx)

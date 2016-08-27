@@ -9,9 +9,6 @@ pane_per_window = 2
 idle_period = 3600000
 
 hosts = [
-        {'user': 'mcloud', 'domain': '123.30.146.209', 'category': 'API', 'desc': 'Blah blah 3'},
-    {'user': 'mcloud', 'domain': '123.30.146.208', 'category': 'API', 'desc': 'Blah blah 3'},
-
     {'user': 'toto2', 'domain': '192.168.10.3', 'category': 'API', 'desc': 'Blah blah 3'},
     {'user': 'toto', 'domain': '192.168.10.3', 'category': 'API', 'desc': 'Blah blah 3'},
     {'user': 'toto', 'domain': '192.168.10.3', 'category': 'API', 'desc': 'Blah blah 3'},

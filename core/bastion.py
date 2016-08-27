@@ -491,6 +491,9 @@ class Bastion(object):
                     self.picker.move_down()
                     self.screen.redraw()
 
+                elif key == curses.KEY_RESIZE:
+                    self.screen.redraw()
+
                 elif key == 10: # Press Enter
                     if self.multi_select:
                         ms_hosts = self.picker.ms_items()
@@ -522,6 +525,10 @@ class Bastion(object):
                         self.multi_select = True
                         self.picker.enter_multi_select()
 
+                    self.screen.redraw()
+
+                elif key == ord('A') and self.multi_select:
+                    self.picker.multi_select_all()
                     self.screen.redraw()
 
                 elif key == ord('I'):  # Press Shift+i
@@ -568,6 +575,9 @@ class Bastion(object):
                 self.picker.update(cate.total_hosts, 0)
                 self.screen.redraw()
 
+        elif key == curses.KEY_RESIZE:
+            self.screen.redraw()
+
     def handle_event_in_search_mode(self, key):
         if key == 27:  # Press 'ESC'
             self.screen.exit_search_mode()
@@ -600,6 +610,10 @@ class Bastion(object):
 
             self.screen.redraw()
 
+        elif key == ord('A') and self.multi_select:
+            self.picker.multi_select_all()
+            self.screen.redraw()
+
         elif key == 10: # Press Enter
             if self.multi_select:
                 self.multi_select = False
@@ -616,7 +630,7 @@ class Bastion(object):
                         open_ssh_in_tmux(host)
 
         elif key == curses.KEY_RESIZE:
-            pass
+            self.screen.redraw()
 
         elif key == ord('I'):  # Press Shift+i
             curses.beep()

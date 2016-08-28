@@ -322,13 +322,14 @@ class Screen(object):
     def redraw(self):
         self.clear()
         self.window.border(0)
-        if self.bastion.showing_cat:
+        h = self.get_height()
+        if self.bastion.showing_cat and h >= (self.logo_height + 2 + len(self.bastion.cat_picker.items)):
             self.display_logo()
             self.display_header()
             self.display_categories()
             self.display_search_box()
             self.refresh()
-        else:
+        elif h >= (self.logo_height + 2 + len(self.bastion.picker.items)):
             self.display_logo()
             self.display_header()
             self.display_hosts()

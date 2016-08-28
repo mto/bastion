@@ -323,18 +323,22 @@ class Screen(object):
         self.clear()
         self.window.border(0)
         h = self.get_height()
-        if self.bastion.showing_cat and h >= (self.logo_height + 2 + len(self.bastion.cat_picker.items)):
+        w = self.get_width()
+        if self.bastion.showing_cat and h >= (
+                self.logo_height + 2 + len(self.bastion.cat_picker.items)) and w > self.cat_table_length:
             self.display_logo()
             self.display_header()
             self.display_categories()
             self.display_search_box()
             self.refresh()
-        elif h >= (self.logo_height + 2 + len(self.bastion.picker.items)):
+        elif h >= (self.logo_height + 2 + len(self.bastion.picker.items)) and w > self.host_table_length:
             self.display_logo()
             self.display_header()
             self.display_hosts()
             self.display_search_box()
             self.refresh()
+        else:
+            self.window.addstr(1, 1, "Minimum size: 40 x 100")
 
     def show_host_detail(self, host):
         assert isinstance(host, SSHConnectParam)

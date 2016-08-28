@@ -89,7 +89,6 @@ def open_multi_ssh_in_tmux_panes(hosts, ppw=None):
             else:
                 open_ssh_in_tmux(host)
 
-            open_tmux_window(hosts[nbw * ppw + 1])
             for k in range(1, n - nbw * ppw):
                 host = hosts[nbw*ppw+k]
                 if host.record:

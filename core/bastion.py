@@ -61,9 +61,10 @@ def open_multi_ssh_in_tmux(hosts):
             open_ssh_in_tmux(host)
 
 
-def open_multi_ssh_in_tmux_panes(hosts):
+def open_multi_ssh_in_tmux_panes(hosts, ppw=None):
     n = len(hosts)
-    ppw = config.pane_per_window
+    if not ppw:
+        ppw = config.pane_per_window
     if ppw == 1:
         open_multi_ssh_in_tmux(hosts)
     else:
@@ -205,6 +206,7 @@ class Screen(object):
         self.search_txt = ''
         self.display_panel = curses.panel.new_panel(curses.newwin(30, 100, 5, 10))
         self.display_log_panel = curses.panel.new_panel(curses.newwin(30, 100, 5, 10))
+        self.ask_nbp_panel = curses.panel.new_panel(curses.newwin(8, 50, 15, 30))
         self.admin_mode = admin_mode
         self.logo_content = logo_content
         self.logo_height = len(self.logo_content) + 2
@@ -399,6 +401,41 @@ class Screen(object):
 
         self.display_log_panel.hide()
 
+    def ask_number_of_panes_dialog(self, hosts):
+        anpd = self.ask_nbp_panel.window()
+        anpd.clear()
+        anpd.border(0)
+        nbp_val = ''
+        anpd.addstr(5, 1, '[ENTER] Open connections | [ESC] Quit')
+        anpd.addstr(1, 1, 'Enter number of panes per window: ' + nbp_val)
+        while True:
+            key = anpd.getch()
+            if key == 27:
+                break
+
+            if key == 10:
+                nbp = 0
+                try:
+                    nbp = int(nbp_val)
+                except Exception as ex:
+                    pass
+
+                if nbp > 0:
+                    open_multi_ssh_in_tmux_panes(hosts, ppw=nbp)
+                break
+
+            elif key in range(48, 58):
+                nbp_val += chr(key)
+                anpd.addstr(1, 1, 'Enter number of panes per window: ' + nbp_val)
+                anpd.refresh()
+
+            elif key == 127 and len(nbp_val) > 0:
+                nbp_val = nbp_val[:-1]
+                anpd.addstr(1, 1, 'Enter number of panes per window: ' + nbp_val)
+                anpd.refresh()
+
+        self.ask_nbp_panel.hide()
+
 
 class LogManager(object):
     def __init__(self, folder):
@@ -500,7 +537,8 @@ class Bastion(object):
                         self.multi_select = False
                         self.picker.exit_multi_select()
                         if len(ms_hosts) > 0:
-                            open_multi_ssh_in_tmux_panes(ms_hosts)
+                            #open_multi_ssh_in_tmux_panes(ms_hosts)
+                            self.screen.ask_number_of_panes_dialog(ms_hosts)
                     else:
                         host = self.picker.current()
                         if host is not None:
@@ -620,7 +658,7 @@ class Bastion(object):
                 ms_hosts = self.picker.ms_items()
                 self.picker.exit_multi_select()
                 if len(ms_hosts) > 0:
-                    open_multi_ssh_in_tmux_panes(ms_hosts)
+                    self.screen.ask_number_of_panes_dialog(ms_hosts)
             else:
                 host = self.picker.current()
                 if host is not None:
